@@ -28,3 +28,8 @@ Desktop.ini
 *.key
 secrets/
 local_data/
+
+# Frontend
+web/node_modules/
+web/dist-ssr/
+# web/dist e versionado (agente serve sem npm no cliente)

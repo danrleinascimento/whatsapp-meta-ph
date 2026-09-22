@@ -15,7 +15,7 @@ from app.db import repos
 
 logger = logging.getLogger("whatsmeta.poller")
 
-_STATE = {"since": 0, "stop": False}
+_STATE = {"since": 0, "stop": False, "loaded": False}
 _THREAD: Optional[threading.Thread] = None
 
 
@@ -44,7 +44,6 @@ def _apply_payload(payload: Any) -> int:
 
     entries = payload.get("entry") or []
     if not isinstance(entries, list):
-        # Pode ser o change.value ja isolado
         entries = [{"changes": [{"value": payload}]}]
 
     for entry in entries:
@@ -66,7 +65,10 @@ def _apply_payload(payload: Any) -> int:
                 errors = st.get("errors") or []
                 if errors and isinstance(errors, list) and isinstance(errors[0], dict):
                     err_code = str(errors[0].get("code") or "") or None
-                    err_msg = str(errors[0].get("title") or errors[0].get("message") or "") or None
+                    err_msg = (
+                        str(errors[0].get("title") or errors[0].get("message") or "")
+                        or None
+                    )
                 if mid and status:
                     n = repos.update_message_status_by_meta_id(
                         str(mid),
@@ -78,11 +80,34 @@ def _apply_payload(payload: Any) -> int:
     return updated
 
 
+def _ensure_since_loaded() -> None:
+    if _STATE["loaded"]:
+        return
+    settings = get_settings()
+    try:
+        _STATE["since"] = repos.poll_state_get(settings.installation_id)
+        logger.info("Poller since_id carregado=%s", _STATE["since"])
+    except Exception:
+        logger.exception("Poller: falha ao carregar since_id (tabela 003?)")
+        _STATE["since"] = 0
+    _STATE["loaded"] = True
+
+
+def _persist_since() -> None:
+    settings = get_settings()
+    try:
+        repos.poll_state_set(settings.installation_id, int(_STATE["since"]))
+    except Exception:
+        logger.debug("Poller: nao persistiu since_id", exc_info=True)
+
+
 def poll_once() -> int:
     settings = get_settings()
     if not settings.hub_base_url or not settings.hub_pull_secret:
         logger.debug("Poller: HUB_BASE_URL/HUB_PULL_SECRET ausentes — skip")
         return 0
+
+    _ensure_since_loaded()
 
     cfg = repos.get_config(settings.installation_id)
     waba_id = (cfg or {}).get("waba_id")
@@ -91,7 +116,11 @@ def poll_once() -> int:
         return 0
 
     url = settings.hub_base_url.rstrip("/") + "/v1/hub/events"
-    params: dict[str, Any] = {"since": _STATE["since"], "limit": 100, "waba_id": waba_id}
+    params: dict[str, Any] = {
+        "since": _STATE["since"],
+        "limit": 100,
+        "waba_id": waba_id,
+    }
     headers = {"X-PH-Hub-Secret": settings.hub_pull_secret}
 
     with httpx.Client(timeout=30.0) as client:
@@ -112,6 +141,9 @@ def poll_once() -> int:
 
     if data.get("next_since") and int(data["next_since"]) > _STATE["since"]:
         _STATE["since"] = int(data["next_since"])
+
+    if events:
+        _persist_since()
 
     if total:
         logger.info("Poller atualizou %s mensagem(ns)", total)
@@ -135,6 +167,7 @@ def start_poller() -> None:
     if _THREAD and _THREAD.is_alive():
         return
     _STATE["stop"] = False
+    _STATE["loaded"] = False
     _THREAD = threading.Thread(target=_loop, name="hub-poller", daemon=True)
     _THREAD.start()
 

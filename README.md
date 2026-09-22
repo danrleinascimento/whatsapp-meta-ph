@@ -38,8 +38,9 @@ Roteiro mestre: `ROTEIRO_COMPLETO_DESENVOLVIMENTO_WHATSAPP_META_PH.md`
 | POST | `/v1/whatsapp/send-batch` | API key |
 | POST | `/v1/whatsapp/pairing/claim?pair_code=` | API key |
 | POST | `/v1/panel/ticket` | API key (GEPH) |
+| GET | `/v1/panel/session?ticket=` | ticket HMAC |
 | GET | `/v1/panel/messages?ticket=` | ticket HMAC |
-| GET | `/?ticket=` | ticket HMAC (painel) |
+| GET | `/?ticket=` | painel React (`web/dist`) |
 
 ## Setup agente (dev neste PC)
 
@@ -57,6 +58,18 @@ python scripts\seed_dev_config.py
 
 uvicorn app.main:app --host 127.0.0.1 --port 8765
 ```
+
+## Painel React (WHATSPH)
+
+```powershell
+cd C:\projetos\python\whatsmeta\web
+npm install
+npm run build
+cd ..
+python scripts\gen_panel_ticket.py ADMIN
+```
+
+Abra a URL com `?ticket=`. UI moderna (Vite + Tailwind); sem ticket = tela bloqueada.
 
 ## Como testar (checklist)
 

@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --color-ink: #063a36;
+  --color-ink-soft: #0d524c;
+  --color-leaf: #1b9e6e;
+  --color-leaf-bright: #2ecf8a;
+  --color-mist: #e8eef0;
+  --color-paper: #f4f8f7;
+  --color-line: #c5d5d2;
+  --color-muted: #5a736f;
+  --color-danger: #b42318;
+  --color-warn: #b54708;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background:
+    radial-gradient(900px 480px at 85% -10%, rgba(46, 207, 138, 0.18), transparent 55%),
+    radial-gradient(700px 420px at -5% 100%, rgba(6, 58, 54, 0.12), transparent 50%),
+    linear-gradient(165deg, #dfece8 0%, var(--color-mist) 42%, #d3e4e0 100%);
+  background-attachment: fixed;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 0.7;
+  }
+}
+
+.anim-rise {
+  animation: rise-in 0.45s ease-out both;
+}
+
+.anim-rise-delay {
+  animation: rise-in 0.55s ease-out 0.08s both;
+}
+
+.pulse-dot {
+  animation: pulse-dot 1.8s ease-in-out infinite;
+}

@@ -27,6 +27,19 @@ logger = logging.getLogger("whatsmeta")
 async def lifespan(app: FastAPI):
     role = settings.app_role
     logger.info("Iniciando whatsmeta role=%s version=%s", role, __version__)
+    if settings.database_url:
+        try:
+            from app.db.migrate import migrate_for_role
+
+            result = migrate_for_role(role)
+            logger.info("Migrate: %s", result)
+            if role == "hub" and not result.get("schema_ok"):
+                logger.warning(
+                    "Schema webhook ausente — hub usara fallback em memoria "
+                    "(Dev DB sem CREATE). Preferir doadmin/Neon para persistir."
+                )
+        except Exception:
+            logger.exception("Migrate falhou no startup")
     if role == "agent":
         from app.agent.poller import start_poller, stop_poller
 
@@ -54,9 +67,16 @@ if settings.app_role == "hub":
     app.include_router(webhook_router)
     app.include_router(hub_router)
 else:
+    from pathlib import Path
+
+    from fastapi.staticfiles import StaticFiles
+
     from app.agent.routes import router as agent_router
 
     app.include_router(agent_router)
+    _dist_assets = Path(__file__).resolve().parents[1] / "web" / "dist" / "assets"
+    if _dist_assets.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(_dist_assets)), name="panel_assets")
 
 
 @app.get("/health")
@@ -70,6 +90,19 @@ def health() -> dict:
     }
     if settings.database_url:
         payload["db_ok"] = db_ok()
+        try:
+            from app.db.migrate import schema_ok
+
+            payload["schema_ok"] = schema_ok()
+        except Exception:
+            payload["schema_ok"] = False
+        if settings.app_role == "hub" and not payload.get("schema_ok"):
+            from app.hub.event_memory import memory_count
+
+            payload["events_backend"] = "memory"
+            payload["events_memory_count"] = memory_count()
+        elif settings.app_role == "hub":
+            payload["events_backend"] = "postgres"
     else:
         payload["db_ok"] = None
     return payload

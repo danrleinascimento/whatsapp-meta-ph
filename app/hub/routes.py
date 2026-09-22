@@ -60,6 +60,17 @@ def pull_events(
     return {"events": events, "next_since": next_since}
 
 
+@router.post("/v1/hub/migrate")
+def hub_migrate(_: str = Depends(require_hub_secret)) -> dict[str, Any]:
+    """Aplica sql/001+002 no Postgres do hub (mesmo codigo do GitHub)."""
+    from app.db.migrate import apply_sql_files, HUB_SQL_FILES
+    from app.db.repos import invalidate_schema_cache
+
+    result = apply_sql_files(HUB_SQL_FILES)
+    invalidate_schema_cache()
+    return result
+
+
 class PairingStoreRequest(BaseModel):
     installation_id: str = Field(..., min_length=1, max_length=64)
     waba_id: str
@@ -69,23 +80,62 @@ class PairingStoreRequest(BaseModel):
     graph_api_version: str = "v25.0"
 
 
+def _store_pairing_blob(
+    *,
+    pair_code: str,
+    installation_id: str,
+    waba_id: Optional[str],
+    phone_number_id: Optional[str],
+    access_token: str,
+    display_phone: Optional[str],
+    graph_api_version: str,
+) -> None:
+    expires_ts = time.time() + _PAIRING_TTL_SECONDS
+    import datetime as _dt
+
+    expires_at = _dt.datetime.utcfromtimestamp(expires_ts)
+    try:
+        repos.pairing_store_db(
+            pair_code=pair_code,
+            installation_id=installation_id,
+            waba_id=waba_id,
+            phone_number_id=phone_number_id,
+            access_token=access_token,
+            display_phone=display_phone,
+            graph_api_version=graph_api_version,
+            expires_at=expires_at,
+        )
+        return
+    except Exception:
+        logger.exception("Pairing DB indisponivel — fallback memoria")
+    _PAIRING[pair_code] = {
+        "installation_id": installation_id,
+        "waba_id": waba_id,
+        "phone_number_id": phone_number_id,
+        "access_token": access_token,
+        "display_phone": display_phone,
+        "graph_api_version": graph_api_version,
+        "expires_at": expires_ts,
+        "claimed": False,
+    }
+
+
 @router.post("/v1/hub/pairing/store")
 def pairing_store(
     body: PairingStoreRequest,
     _: str = Depends(require_hub_secret),
 ) -> dict[str, str]:
-    """Armazena blob temporario apos Embedded Signup (chamado pelo proprio hub)."""
+    """Armazena blob temporario apos Embedded Signup."""
     code = secrets.token_urlsafe(24)
-    _PAIRING[code] = {
-        "installation_id": body.installation_id,
-        "waba_id": body.waba_id,
-        "phone_number_id": body.phone_number_id,
-        "access_token": body.access_token,
-        "display_phone": body.display_phone,
-        "graph_api_version": body.graph_api_version,
-        "expires_at": time.time() + _PAIRING_TTL_SECONDS,
-        "claimed": False,
-    }
+    _store_pairing_blob(
+        pair_code=code,
+        installation_id=body.installation_id,
+        waba_id=body.waba_id,
+        phone_number_id=body.phone_number_id,
+        access_token=body.access_token,
+        display_phone=body.display_phone,
+        graph_api_version=body.graph_api_version,
+    )
     return {"pair_code": code}
 
 
@@ -96,6 +146,22 @@ def pairing_claim(
     _: str = Depends(require_hub_secret),
 ) -> dict[str, Any]:
     """Agente local busca o token uma unica vez."""
+    try:
+        data = repos.pairing_claim_db(pair_code, installation_id)
+        if data is not None:
+            err = data.get("__error__")
+            if err == "claimed":
+                raise HTTPException(status_code=410, detail="pair_code ja utilizado")
+            if err == "expired":
+                raise HTTPException(status_code=410, detail="pair_code expirado")
+            if err == "installation":
+                raise HTTPException(status_code=403, detail="installation_id nao confere")
+            return data
+    except HTTPException:
+        raise
+    except Exception:
+        logger.debug("Pairing claim DB falhou — tenta memoria", exc_info=True)
+
     blob = _PAIRING.get(pair_code)
     if not blob:
         raise HTTPException(status_code=404, detail="pair_code invalido ou expirado")
@@ -106,8 +172,6 @@ def pairing_claim(
         raise HTTPException(status_code=410, detail="pair_code expirado")
     if blob.get("installation_id") != installation_id:
         raise HTTPException(status_code=403, detail="installation_id nao confere")
-    blob["claimed"] = True
-    # Remover do mapa apos entregar
     data = dict(blob)
     _PAIRING.pop(pair_code, None)
     data.pop("claimed", None)
@@ -175,16 +239,15 @@ def exchange_embedded_signup(body: ExchangeCodeRequest) -> dict[str, Any]:
             logger.exception("Falha subscribed_apps")
 
     pair_code = secrets.token_urlsafe(24)
-    _PAIRING[pair_code] = {
-        "installation_id": body.installation_id,
-        "waba_id": body.waba_id,
-        "phone_number_id": body.phone_number_id,
-        "access_token": access_token,
-        "display_phone": body.display_phone,
-        "graph_api_version": settings.graph_api_version,
-        "expires_at": time.time() + _PAIRING_TTL_SECONDS,
-        "claimed": False,
-    }
+    _store_pairing_blob(
+        pair_code=pair_code,
+        installation_id=body.installation_id,
+        waba_id=body.waba_id,
+        phone_number_id=body.phone_number_id,
+        access_token=access_token,
+        display_phone=body.display_phone,
+        graph_api_version=settings.graph_api_version,
+    )
     return {
         "ok": True,
         "pair_code": pair_code,

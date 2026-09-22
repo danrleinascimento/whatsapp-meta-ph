@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
 from app.agent.auth import create_panel_ticket, require_api_key, verify_panel_ticket
 from app.agent.schemas import (
@@ -21,6 +22,9 @@ from app.config import get_settings
 from app.db import repos
 
 router = APIRouter(tags=["agent"])
+
+_WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
+_WEB_INDEX = _WEB_DIST / "index.html"
 
 
 @router.get("/v1/whatsapp/status")
@@ -216,6 +220,24 @@ def api_pairing_claim(
     }
 
 
+@router.get("/v1/panel/session")
+def api_panel_session(ticket: str = Query(...)) -> dict[str, Any]:
+    """Sessao do painel React (ticket GEPH). Sem App Secret / token Meta."""
+    usuario = verify_panel_ticket(ticket)
+    settings = get_settings()
+    cfg = repos.get_config(settings.installation_id)
+    status = (cfg or {}).get("status") or "DISCONNECTED"
+    return {
+        "usuario_geph": usuario,
+        "installation_id": settings.installation_id,
+        "status": status,
+        "connected": status == "CONNECTED",
+        "display_phone": (cfg or {}).get("display_phone"),
+        "waba_id": (cfg or {}).get("waba_id"),
+        "last_error": (cfg or {}).get("last_error"),
+    }
+
+
 @router.get("/v1/panel/messages")
 def api_panel_messages(
     ticket: str = Query(...),
@@ -235,13 +257,22 @@ def api_panel_messages(
     return {"usuario_geph": usuario, "messages": out}
 
 
-@router.get("/", response_class=HTMLResponse)
-def panel_home(ticket: Optional[str] = Query(None)) -> HTMLResponse:
+@router.get("/favicon.svg")
+def panel_favicon():
+    fav = _WEB_DIST / "favicon.svg"
+    if fav.is_file():
+        return FileResponse(fav, media_type="image/svg+xml")
+    raise HTTPException(status_code=404, detail="favicon ausente")
+
+
+@router.get("/")
+def panel_home(ticket: Optional[str] = Query(None)):
+    """Painel React (web/dist) quando buildado; fallback HTML legado."""
+    if _WEB_INDEX.is_file():
+        # SPA valida ticket via /v1/panel/session
+        return FileResponse(_WEB_INDEX, media_type="text/html")
     if not ticket:
-        return HTMLResponse(
-            content=_page_blocked(),
-            status_code=403,
-        )
+        return HTMLResponse(content=_page_blocked(), status_code=403)
     try:
         usuario = verify_panel_ticket(ticket)
     except HTTPException:
