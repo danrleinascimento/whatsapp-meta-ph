@@ -88,14 +88,24 @@ Esperado: HTTP **400**.
 
 ### 4) Envio template real (celular BR)
 
-Coloque um PDF de teste em `C:\PHSFTW\...` se for testar documento.  
-Para template (ex. `hello_world` no idioma aprovado no App):
+Liste os nomes **exatos** aprovados na WABA (nao confie so no curl do painel Meta):
 
 ```powershell
-python scripts\smoke_test.py --send-template --to 5549XXXXXXXXX --template hello_world --lang en_US
+python scripts\list_templates.py
+# ou: GET http://127.0.0.1:8765/v1/whatsapp/templates
+```
+
+Envio (o agente resolve alias `lp_`→`3p_` e valida idioma APPROVED):
+
+```powershell
+python scripts\smoke_test.py --send-template --to 5549XXXXXXXXX
+# ou explicito:
+python scripts\smoke_test.py --send-template --to 5549XXXXXXXXX --template 3p_direct_integration_test_template --lang en_US
 ```
 
 Confira o celular e a tabela `whatsapp_message`.
+
+**Erros Meta comuns:** `132001` = nome/idioma errados; `131058` = `hello_world` so no Public Test Number.
 
 ### 5) Painel (somente com ticket)
 

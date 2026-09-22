@@ -10,7 +10,8 @@ from pydantic import BaseModel, Field
 class SendTemplateRequest(BaseModel):
     to: str
     template_name: str
-    language_code: str = "pt_BR"
+    # Opcional: se omitido, usa o language APPROVED retornado pela Meta para o nome
+    language_code: Optional[str] = None
     components: Optional[list[dict[str, Any]]] = None
     sistema_origem: Optional[str] = "GEPH"
     usuario_geph: Optional[str] = None
@@ -38,7 +39,7 @@ class BatchItem(BaseModel):
     to: str
     body: Optional[str] = None
     template_name: Optional[str] = None
-    language_code: Optional[str] = "pt_BR"
+    language_code: Optional[str] = None
     components: Optional[list[dict[str, Any]]] = None
     file_path: Optional[str] = None
     caption: Optional[str] = None

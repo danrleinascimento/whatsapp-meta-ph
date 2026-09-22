@@ -18,6 +18,7 @@ from app.graph import (
     build_template_payload,
     build_text_payload,
     extract_message_id,
+    resolve_template,
     send_message,
     upload_pdf,
 )
@@ -78,30 +79,48 @@ def send_template(
     *,
     to: str,
     template_name: str,
-    language_code: str = "pt_BR",
+    language_code: Optional[str] = None,
     components: Optional[list[dict[str, Any]]] = None,
     sistema_origem: Optional[str] = None,
     usuario_geph: Optional[str] = None,
 ) -> dict[str, Any]:
+    """Envia template apos resolver name+language APPROVED na WABA (doc Meta)."""
     settings = get_settings()
     cfg = get_connected_config()
     to_wa = normalize_wa_id(to)
-    payload = build_template_payload(
-        to_wa,
+    token = _access_token(cfg)
+
+    # Valida/resolve contra GET /{WABA}/message_templates (evita 132001)
+    resolved = resolve_template(
+        waba_id=str(cfg["waba_id"]),
+        access_token=token,
         template_name=template_name,
         language_code=language_code,
+    )
+    payload = build_template_payload(
+        to_wa,
+        template_name=resolved["name"],
+        language_code=resolved["language"],
         components=components,
     )
-    return _dispatch(
+    result = _dispatch(
         cfg=cfg,
         installation_id=settings.installation_id,
         msg_type="template",
         to_wa_id=to_wa,
         payload=payload,
-        template_name=template_name,
+        template_name=resolved["name"],
         sistema_origem=sistema_origem,
         usuario_geph=usuario_geph,
+        access_token=token,
     )
+    result["template_resolved"] = {
+        "name": resolved["name"],
+        "language": resolved["language"],
+        "category": resolved.get("category"),
+        "resolved_from": resolved.get("resolved_from"),
+    }
+    return result
 
 
 def send_text(
@@ -210,7 +229,7 @@ def send_batch(items: list[dict[str, Any]]) -> dict[str, Any]:
                 r = send_template(
                     to=item["to"],
                     template_name=item["template_name"],
-                    language_code=item.get("language_code") or "pt_BR",
+                    language_code=item.get("language_code") or None,
                     components=item.get("components"),
                     **common,
                 )

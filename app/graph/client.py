@@ -41,9 +41,19 @@ def _parse_error(resp: httpx.Response) -> GraphError:
         raw = resp.json()
         err = raw.get("error") if isinstance(raw, dict) else None
         if isinstance(err, dict):
-            msg = str(err.get("message") or msg)
+            msg = str(
+                err.get("error_user_msg")
+                or err.get("message")
+                or msg
+            )
+            details = err.get("error_data")
+            if isinstance(details, dict) and details.get("details"):
+                msg = f"{msg} ({details.get('details')})"
             if err.get("code") is not None:
                 code = str(err.get("code"))
+            from app.graph.errors import friendly_meta_error
+
+            msg = friendly_meta_error(code, msg)
     except Exception:
         msg = resp.text[:500] or msg
     return GraphError(msg, http_status=resp.status_code, error_code=code, raw=raw)

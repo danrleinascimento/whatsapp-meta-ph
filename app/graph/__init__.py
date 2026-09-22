@@ -7,6 +7,11 @@ from app.graph.client import (
     send_message,
     upload_pdf,
 )
+from app.graph.templates import (
+    list_message_templates,
+    pick_smoke_template,
+    resolve_template,
+)
 
 __all__ = [
     "GraphError",
@@ -14,6 +19,9 @@ __all__ = [
     "build_template_payload",
     "build_text_payload",
     "extract_message_id",
+    "list_message_templates",
+    "pick_smoke_template",
+    "resolve_template",
     "send_message",
     "upload_pdf",
 ]

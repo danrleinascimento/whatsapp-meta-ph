@@ -47,6 +47,45 @@ def whatsapp_status(_: str = Depends(require_api_key)) -> dict[str, Any]:
     }
 
 
+@router.get("/v1/whatsapp/templates")
+def whatsapp_templates(
+    status: Optional[str] = Query("APPROVED"),
+    _: str = Depends(require_api_key),
+) -> dict[str, Any]:
+    """Lista templates da WABA via API oficial Meta message_templates."""
+    from app.crypto import decrypt_token
+    from app.graph import list_message_templates
+
+    settings = get_settings()
+    cfg = repos.get_config(settings.installation_id)
+    if not cfg or cfg.get("status") != "CONNECTED":
+        raise HTTPException(status_code=409, detail="WhatsApp nao CONECTADO")
+    if not cfg.get("waba_id") or not cfg.get("access_token_enc"):
+        raise HTTPException(status_code=409, detail="waba_id/token ausentes")
+    try:
+        rows = list_message_templates(
+            waba_id=str(cfg["waba_id"]),
+            access_token=decrypt_token(cfg["access_token_enc"]),
+            status=status,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {
+        "waba_id": cfg.get("waba_id"),
+        "status_filter": status,
+        "templates": [
+            {
+                "name": r.get("name"),
+                "language": r.get("language"),
+                "status": r.get("status"),
+                "category": r.get("category"),
+                "id": r.get("id"),
+            }
+            for r in rows
+        ],
+    }
+
+
 @router.post("/v1/whatsapp/send-template")
 def api_send_template(
     body: SendTemplateRequest,
