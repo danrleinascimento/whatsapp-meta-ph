@@ -11,13 +11,13 @@
 
 | Fase | Conteúdo | Status código | O que falta (manual) |
 |------|----------|---------------|----------------------|
-| A | Hub schema persistente | migrate + memory OK | Neon/doadmin no DO |
-| B | Build PH.bpl + GEPH | fontes + bpk atualizados | **Rebuild no BCB5** |
+| A | Hub schema persistente | migrate + memory OK; hub **0.2.4** | Neon/doadmin → `schema_ok=true` |
+| B | Build PH.bpl + GEPH | fontes + bpk OK; **Ui.obj ausente** | **Rebuild PH.bpl + GEPH no BCB5** |
 | C | Telas Status / Painel | `WhatsMetaUi` + botões Preview | Validar no exe após Build |
-| D | `dist\whatsph` | `scripts/build_dist.ps1` **OK** | Copiar `nssm.exe` |
-| E | Inno + NSSM | `WHATSPH.iss` 0.2.4 + bats | Compilar no Inno Setup 6 |
-| F | Teste VM | checklist abaixo | Rodar Setup em VM |
-| G | Embedded Signup | scaffold hub | config_id Meta |
+| D | `dist\whatsph` | pasta gerada com `.venv` | Copiar **`nssm.exe`** |
+| E | Inno + NSSM | `.iss` 0.2.4 + bats | Instalar Inno 6 + Compile Setup |
+| F | Teste VM / aceite | checklist no roteiro | Rodar Setup + health |
+| G | Embedded Signup | scaffold hub | `config_id` Meta |
 | H | Piloto | docs | após F+G |
 
 ### Artefatos novos (23/09)
@@ -50,19 +50,21 @@
 
 ---
 
-## 0. O que já está pronto (não refazer)
-
-Verificado em 22/09/2026:
+## 0. O que já está pronto (verificado 23/09/2026 08:45)
 
 | Camada | Evidência |
 |--------|-----------|
-| Hub DO | `https://whatsapp-meta-ph-wzewk.ondigitalocean.app/health` → `role=hub` `v0.2.3` `db_ok=true` |
-| Hub eventos | Poller local `GET /v1/hub/events` → **200**; `events_backend=memory` (`schema_ok=false` no Dev DB) |
-| Agente | Smoke template `ACCEPTED`; PDF teste manhã `ACCEPTED`; painel React com ticket |
-| Código agente | Rotas status, templates, send-*, batch, panel ticket/session/messages, pairing claim |
-| PHVCL | `WhatsMetaClient.h/.cpp`, hook em `SenWA.cpp`, `USEUNIT` em `PH.cpp`, obj em `PH.bpk` |
-| Preview | Já abre `TSendWA1` (SenWA) — não precisa duplicar envio no Preview |
-| Instalador | Rascunho `installer/WHATSPH.iss` + `install_service.bat` (NSSM) — **falta empacotar** |
+| Hub DO | `/health` → `role=hub` **`v0.2.4`** `db_ok=true` `schema_ok=false` `events_backend=memory` |
+| GitHub | `main` @ `8fa1ca1` |
+| `dist\whatsph` | Existe: app, `.venv`, `web\dist`, sql, bats — **falta `nssm.exe`** |
+| Instalador scripts | `first_run` / `apply_sql` / `install_service` / `WHATSPH.iss` 0.2.4 |
+| Inno Setup neste PC | **Não instalado** (ISCC.exe ausente) |
+| PHVCL fontes | Client + Ui + SenWA + Preview + PH.cpp/bpk — **CP1252 OK** |
+| `WhatsMetaClient.obj` | Existe |
+| `WhatsMetaUi.obj` | **NÃO existe** → Rebuild PH.bpl **obrigatório** |
+| Agente `:8765` agora | **Offline** (subir quando for testar) |
+| Painel React / smoke Meta | Já comprovados em 22/09 |
+| Embedded Signup `config_id` | Ainda não criado |
 
 **Caminhos fixos**
 

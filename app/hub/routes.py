@@ -282,10 +282,10 @@ code{{background:#0f172a;padding:.15rem .35rem;border-radius:4px}}
 </style>
 <script async defer crossorigin="anonymous" src="https://connect.facebook.net/en_US/sdk.js"></script>
 </head><body><div class="card">
-<h1>Conectar WhatsApp</h1>
-<p>Escritorio: <code>{safe_inst}</code></p>
-<p>Use o login Meta da empresa do escritorio. App Secret nunca fica no cliente.</p>
-<button type="button" onclick="launchWhatsAppSignup()">Conectar com Meta</button>
+<h1>Conectar conta WhatsApp</h1>
+<p>Escritório: <code>{safe_inst}</code></p>
+<p>Entre com a conta WhatsApp Business da empresa. Dados sensíveis ficam só no servidor da PH Softwares — nunca no computador do escritório.</p>
+<button type="button" onclick="launchWhatsAppSignup()">Conectar conta WhatsApp</button>
 <div id="msg"></div>
 </div>
 <script>
@@ -298,12 +298,12 @@ window.fbAsyncInit = function() {{
 function launchWhatsAppSignup() {{
   const msg = document.getElementById('msg');
   if (!APP_ID || !CONFIG_ID) {{
-    msg.textContent = 'META_APP_ID / META_EMBEDDED_SIGNUP_CONFIG_ID nao configurados no hub.';
+    msg.textContent = 'Cadastro WhatsApp ainda não está liberado no servidor. Fale com o suporte PH Softwares.';
     return;
   }}
   FB.login(function(response) {{
     if (response.authResponse && response.authResponse.code) {{
-      msg.textContent = 'Trocando code…';
+      msg.textContent = 'Finalizando a conexão…';
       fetch('/v1/hub/embedded-signup/exchange', {{
         method: 'POST',
         headers: {{'Content-Type': 'application/json'}},
@@ -315,11 +315,11 @@ function launchWhatsAppSignup() {{
         }})
       }}).then(r => r.json()).then(d => {{
         msg.textContent = d.ok
-          ? ('Conectado. Codigo de pareamento: ' + d.pair_code + ' (o agente local busca automaticamente).')
-          : JSON.stringify(d);
-      }}).catch(e => {{ msg.textContent = String(e); }});
+          ? ('Conta conectada. Código de vinculação: ' + d.pair_code + '. O serviço do escritório conclui o resto automaticamente.')
+          : (d.detail || d.message || 'Não foi possível concluir a conexão. Tente novamente.');
+      }}).catch(e => {{ msg.textContent = 'Falha na conexão: ' + String(e); }});
     }} else {{
-      msg.textContent = 'Login cancelado ou sem code.';
+      msg.textContent = 'Conexão cancelada ou incompleta. Tente novamente.';
     }}
   }}, {{
     config_id: CONFIG_ID,

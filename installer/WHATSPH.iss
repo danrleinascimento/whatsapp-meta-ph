@@ -1,7 +1,10 @@
-; Inno Setup 6 — WHATSPH (PH Softwares)
+; Inno Setup 5.5+ / 6 — WHATSPH (PH Softwares)
 ; 1) Rodar scripts\build_dist.ps1
 ; 2) Colocar nssm.exe em dist\whatsph\nssm\
 ; 3) Compilar este .iss
+;
+; Nota: x64compatible / WizardStyle=modern exigem Inno 6.
+; Nesta versao usamos sintaxe 5.5.x (x64).
 
 #define MyAppName "WHATSPH"
 #define MyAppVersion "0.2.4"
@@ -19,9 +22,8 @@ OutputDir=..\dist\installer
 OutputBaseFilename=WHATSPH_Setup_{#MyAppVersion}
 Compression=lzma
 SolidCompression=yes
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
-WizardStyle=modern
+ArchitecturesAllowed=x64
+ArchitecturesInstallIn64BitMode=x64
 
 [Languages]
 Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"

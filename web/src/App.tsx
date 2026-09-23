@@ -3,7 +3,44 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { fetchMessages, fetchSession, getTicket } from './api'
 import type { PanelMessage, PanelSession } from './types'
 
+/** Valores internos da API (não exibidos crus ao usuário). */
 const STATUS_OPTS = ['TODOS', 'ACCEPTED', 'SENT', 'DELIVERED', 'READ', 'FAILED'] as const
+
+function statusLabel(status?: string): string {
+  switch ((status || '').toUpperCase()) {
+    case 'ACCEPTED':
+      return 'Aceito'
+    case 'SENT':
+      return 'Enviado'
+    case 'DELIVERED':
+      return 'Entregue'
+    case 'READ':
+      return 'Lido'
+    case 'FAILED':
+      return 'Com falha'
+    case 'CONNECTED':
+      return 'Conectado'
+    case 'DISCONNECTED':
+      return 'Desconectado'
+    case 'TODOS':
+      return 'Todas as situações'
+    default:
+      return status || '—'
+  }
+}
+
+function tipoEnvioLabel(tipo?: string): string {
+  switch ((tipo || '').toLowerCase()) {
+    case 'document':
+      return 'Documento (PDF)'
+    case 'template':
+      return 'Modelo de mensagem'
+    case 'text':
+      return 'Texto'
+    default:
+      return tipo || '—'
+  }
+}
 
 function statusTone(status?: string): string {
   switch ((status || '').toUpperCase()) {
@@ -36,10 +73,12 @@ function detailOf(m: PanelMessage): string {
   if (m.error_message) {
     return `${m.error_code ? `${m.error_code}: ` : ''}${m.error_message}`
   }
-  if (m.template_name) return `Template: ${m.template_name}`
+  if (m.template_name) return `Modelo: ${m.template_name}`
   if (m.caption) return m.caption
-  if (m.local_file_path) return m.local_file_path
-  if (m.meta_message_id) return m.meta_message_id
+  if (m.local_file_path) {
+    const parts = m.local_file_path.replace(/\\/g, '/').split('/')
+    return parts[parts.length - 1] || m.local_file_path
+  }
   return '—'
 }
 
@@ -48,21 +87,22 @@ function Blocked({ expired }: { expired: boolean }) {
     <div className="flex min-h-screen items-center justify-center px-6">
       <div className="anim-rise w-full max-w-md border border-[var(--color-line)] bg-[var(--color-paper)]/90 p-8 shadow-[0_24px_60px_rgba(6,58,54,0.12)] backdrop-blur">
         <p className="font-display text-xs font-semibold tracking-[0.22em] text-[var(--color-leaf)]">
-          WHATSPH
+          PH SOFTWARES
         </p>
         <h1 className="mt-3 font-display text-2xl font-semibold tracking-tight text-[var(--color-ink)]">
-          PH Softwares
+          Acompanhar envios WhatsApp
         </h1>
         <div className="mt-5 flex gap-3 text-[var(--color-muted)]">
           <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-[var(--color-warn)]" />
           <div>
             <p className="text-[15px] leading-relaxed text-[var(--color-ink-soft)]">
               {expired
-                ? 'Ticket expirado ou inválido.'
-                : 'Abra o painel pelo sistema PH (GEPH).'}
+                ? 'Este acesso expirou ou não é mais válido.'
+                : 'Abra esta tela pelo GEPH (menu Ferramentas).'}
             </p>
             <p className="mt-2 text-sm leading-relaxed">
-              Não é permitido abrir o painel manualmente sem ticket do GEPH.
+              Por segurança, o acompanhamento de envios só abre a partir do sistema GEPH, com o
+              usuário já identificado.
             </p>
           </div>
         </div>
@@ -119,13 +159,14 @@ export default function App() {
       if (!q) return true
       const blob = [
         m.to_wa_id,
+        tipoEnvioLabel(m.msg_type),
         m.msg_type,
+        statusLabel(m.status),
         m.status,
         m.usuario_geph,
         m.template_name,
         m.caption,
         m.local_file_path,
-        m.meta_message_id,
         m.error_message,
         String(m.id),
       ]
@@ -148,6 +189,12 @@ export default function App() {
   if (bootError === 'missing') return <Blocked expired={false} />
   if (bootError === 'expired' && !session) return <Blocked expired />
 
+  const situacaoConta = session?.connected
+    ? 'Conta conectada'
+    : statusLabel(session?.status) === '—'
+      ? 'Conta não conectada'
+      : statusLabel(session?.status)
+
   return (
     <div className="mx-auto min-h-screen max-w-6xl px-4 pb-10 pt-6 sm:px-6 lg:px-8">
       <header className="anim-rise flex flex-col gap-5 border-b border-[var(--color-ink)]/10 pb-6 sm:flex-row sm:items-end sm:justify-between">
@@ -156,11 +203,11 @@ export default function App() {
             PH SOFTWARES
           </p>
           <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-[var(--color-ink)] sm:text-4xl">
-            WHATSPH
+            Acompanhar envios WhatsApp
           </h1>
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-[var(--color-muted)]">
-            Histórico de envios WhatsApp Cloud API deste escritório. Atualização automática a
-            cada 15 segundos.
+            Veja os boletos e mensagens enviados pelo WhatsApp deste escritório. A lista atualiza
+            sozinha a cada 15 segundos.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -176,11 +223,11 @@ export default function App() {
                 session?.connected ? 'bg-[var(--color-leaf)] pulse-dot' : 'bg-[var(--color-line)]'
               }`}
             />
-            {session?.connected ? 'Conectado' : session?.status || '…'}
+            {situacaoConta}
             {session?.display_phone ? ` · ${session.display_phone}` : ''}
           </div>
           <div className="text-xs text-[var(--color-muted)]">
-            Usuário GEPH:{' '}
+            Usuário no GEPH:{' '}
             <span className="font-medium text-[var(--color-ink)]">
               {session?.usuario_geph || '—'}
             </span>
@@ -192,7 +239,7 @@ export default function App() {
             className="inline-flex items-center gap-2 bg-[var(--color-ink)] px-3.5 py-2 text-sm font-medium text-[var(--color-paper)] transition hover:bg-[var(--color-ink-soft)] disabled:opacity-60"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Atualizar
+            Atualizar lista
           </button>
         </div>
       </header>
@@ -202,7 +249,7 @@ export default function App() {
           ['Total', counts.TOTAL || 0],
           ['Entregues', (counts.DELIVERED || 0) + (counts.READ || 0)],
           ['Enviados', (counts.SENT || 0) + (counts.ACCEPTED || 0)],
-          ['Falhas', counts.FAILED || 0],
+          ['Com falha', counts.FAILED || 0],
         ].map(([label, value]) => (
           <div
             key={String(label)}
@@ -224,7 +271,7 @@ export default function App() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar telefone, status, PDF, usuário…"
+            placeholder="Buscar telefone, situação, PDF ou usuário…"
             className="w-full border border-[var(--color-line)] bg-white/80 py-2.5 pr-3 pl-10 text-sm outline-none focus:border-[var(--color-leaf)]"
           />
         </label>
@@ -232,16 +279,17 @@ export default function App() {
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value as (typeof STATUS_OPTS)[number])}
           className="border border-[var(--color-line)] bg-white/80 px-3 py-2.5 text-sm outline-none focus:border-[var(--color-leaf)]"
+          aria-label="Filtrar por situação do envio"
         >
           {STATUS_OPTS.map((s) => (
             <option key={s} value={s}>
-              {s === 'TODOS' ? 'Todos os status' : s}
+              {statusLabel(s)}
             </option>
           ))}
         </select>
         <p className="text-xs text-[var(--color-muted)] sm:ml-auto">
-          {filtered.length} de {messages.length}
-          {updatedAt ? ` · ${updatedAt.toLocaleTimeString('pt-BR')}` : ''}
+          {filtered.length} de {messages.length} envios
+          {updatedAt ? ` · atualizado às ${updatedAt.toLocaleTimeString('pt-BR')}` : ''}
         </p>
       </section>
 
@@ -252,8 +300,8 @@ export default function App() {
               <tr className="border-b border-[var(--color-line)] bg-[var(--color-ink)] text-[var(--color-paper)]">
                 <th className="px-3 py-3 font-medium">Quando</th>
                 <th className="px-3 py-3 font-medium">Tipo</th>
-                <th className="px-3 py-3 font-medium">Destino</th>
-                <th className="px-3 py-3 font-medium">Status</th>
+                <th className="px-3 py-3 font-medium">Telefone</th>
+                <th className="px-3 py-3 font-medium">Situação</th>
                 <th className="px-3 py-3 font-medium">Usuário</th>
                 <th className="px-3 py-3 font-medium">Detalhe</th>
               </tr>
@@ -274,13 +322,13 @@ export default function App() {
                     <td className="px-3 py-3 whitespace-nowrap text-[var(--color-ink-soft)]">
                       {fmtWhen(m.created_at)}
                     </td>
-                    <td className="px-3 py-3 font-medium">{m.msg_type || '—'}</td>
+                    <td className="px-3 py-3 font-medium">{tipoEnvioLabel(m.msg_type)}</td>
                     <td className="px-3 py-3 font-mono text-[13px]">{m.to_wa_id || '—'}</td>
                     <td className="px-3 py-3">
                       <span
                         className={`inline-block px-2 py-0.5 text-[11px] font-semibold tracking-wide ${statusTone(m.status)}`}
                       >
-                        {m.status || '—'}
+                        {statusLabel(m.status)}
                       </span>
                     </td>
                     <td className="px-3 py-3">{m.usuario_geph || '—'}</td>

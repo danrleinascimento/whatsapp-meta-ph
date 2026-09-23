@@ -373,13 +373,20 @@ DDL detalhado: `ROTEIRO_AGENTE_LOCAL_WHATSAPP_PH.md` § / futuro `sql/001_whatsa
 
 ## 10. Ordem de trabalho **agora** (próximos commits)
 
-1. ~~Q-LOGIN-B / Q-DB2~~ — **fechadas** (ticket só pelo GEPH; DB `whatsapp_ph` conecta; schema SQL aplicado).  
-2. **FASE 1 (em andamento)** — config/agent health + auth API key.  
-3. **FASE 2** — envio template/PDF + fila lote.  
-4. **FASE 3** — hub persist + poll status.  
-5. Painel React (ticket GEPH) → Embedded Signup + Coexistence → instalador → PHVCL.
+**Estado 22/09/2026:** FASE 1–2 **aceitas** (envio template + PDF OK). Código hub/poll no repo.
 
-**Segurança:** senha Postgres foi exposta em chat — **trocar** a senha do role `postgres` no cluster e atualizar `.env` / sistemas PH que usam a mesma senha.
+**Documento operacional dos próximos passos:**  
+`ROTEIRO_PROXIMOS_PASSOS_WHATSPH.md` (N1 hub DO → N6 PHVCL/GEPH → N7 piloto).
+
+Ordem imediata:
+
+1. **N1+N2** — `HUB_PULL_SECRET` + SQL no Postgres DO + redeploy → status DELIVERED no painel.  
+2. **N4** — Embedded Signup (WABA do cliente).  
+3. **N5** — Instalador Windows.  
+4. **N6** — PHVCL + GEPH.  
+5. **N7** — Templates produto + piloto + App Review.
+
+**Segurança:** se senha Postgres / tokens vazaram em chat — **rotacionar**.
 
 ---
 
@@ -409,4 +416,4 @@ DDL detalhado: `ROTEIRO_AGENTE_LOCAL_WHATSAPP_PH.md` § / futuro `sql/001_whatsa
 
 ---
 
-**Fim do roteiro mestre.** Próximo passo humano: responder as 5 perguntas Q-* da seção 3; em seguida iniciar FASE 1 no código.
+**Fim do roteiro mestre.** Próximos passos detalhados: `ROTEIRO_PROXIMOS_PASSOS_WHATSPH.md` (começar por N1 hub DO).
