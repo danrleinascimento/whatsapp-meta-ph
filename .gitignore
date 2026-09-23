@@ -32,4 +32,7 @@ local_data/
 # Frontend
 web/node_modules/
 web/dist-ssr/
-# web/dist e versionado (agente serve sem npm no cliente)
+# web/dist versionado (agente serve sem npm)
+
+# Empacote instalador (gerado por scripts/build_dist.ps1)
+dist/

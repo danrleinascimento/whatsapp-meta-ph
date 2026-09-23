@@ -1,23 +1,28 @@
-# Integracao PHVCL — WhatsMetaClient (N6)
+# Integracao PHVCL — WhatsMetaClient + WhatsMetaUi (N6)
 
-## Arquivos novos
-- `C:\CBuilder5\Projects\Lib\phvcl\WhatsMetaClient.h`
-- `C:\CBuilder5\Projects\Lib\phvcl\WhatsMetaClient.cpp`
+**Revisao:** 23/09/2026
 
-## Arquivos alterados
-- `SenWA.cpp` — tenta Cloud API antes do FTP/Whats.exe
-- `Preview.cpp` — include do client (envio continua via form SenWA)
+## Arquivos
+| Arquivo | Papel | Status |
+|---------|-------|--------|
+| `WhatsMetaClient.h` / `.cpp` | HTTP Indy + FetchStatus | Feito CP1252 |
+| `WhatsMetaUi.h` / `.cpp` | Status / Abrir painel / botoes Preview | Feito CP1252 |
+| `SenWA.cpp` | Meta antes do Whats.exe | Feito |
+| `Preview.cpp` | `WhatsMetaInstalarBotoesPreview` no FormShow | Feito |
+| `PH.cpp` | USEUNIT Client + Ui | Feito |
+| `PH.bpk` | WhatsMetaClient.obj + WhatsMetaUi.obj | Feito |
 
-## No projeto PH.bpl (BCB5)
-1. Project → Add to Project → `WhatsMetaClient.cpp`
-2. Garantir package Indy (`IdHTTP`) linkado (ja usado em Miscelan)
-3. Rebuild PH.bpl + GEPH (CP1252)
+## Botoes no Preview
+Ao abrir Preview: botoes **Meta** (status) e **Painel** (ticket + browser) ao lado de SpeedButton6 (Whats).
 
-## Runtime no cliente
-- Servico WHATSPH em `127.0.0.1:8765`
-- Arquivo `{PHSFTW}\WHATSPH\.env` com `PH_API_KEY`
-- Status CONECTADO (seed ou pairing)
+## Encoding
+CP1252 + CRLF. Usar scripts `scripts/write_whatsmeta_ui_cp1252.py` / patches se precisar reeditar.
 
-## Comportamento
-- Telefone obrigatorio 11 digitos no form SenWA para Meta
-- Se agente offline / desconectado → fluxo legado Whats.exe intacto
+## Build BCB5 (voce)
+1. Abrir `PH.bpk`
+2. Rebuild PH
+3. Rebuild GEPH
+4. Testar: Preview → Meta / Painel / Whats (SenWA)
+
+## Runtime
+`{PHSFTW}\WHATSPH\.env` com `PH_API_KEY`; servico na :8765

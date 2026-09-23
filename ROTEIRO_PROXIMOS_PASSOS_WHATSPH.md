@@ -1,431 +1,277 @@
-# Roteiro — Próximos Passos WHATSPH (pós envio template+PDF OK)
+# Roteiro — Próximos Passos WHATSPH
 
-**Data:** 22/09/2026  
+**Data revisão:** 22/09/2026 17:57 (UTC-3)  
 **Projeto:** `C:\projetos\python\whatsmeta`  
-**GitHub:** https://github.com/danrleinascimento/whatsapp-meta-ph (`main`)  
+**GitHub:** https://github.com/danrleinascimento/whatsapp-meta-ph (`main`, commit `ed859f2`, app **v0.2.3**)  
 **Hub DO:** https://whatsapp-meta-ph-wzewk.ondigitalocean.app  
 **PHVCL:** `C:\CBuilder5\Projects\Lib\phvcl`  
-**GEPH:** `C:\CBuilder5\Projects\GEPH`
+**GEPH:** `C:\CBuilder5\Projects\GEPH`  
+**Regra:** só APIs oficiais Meta. App Secret **somente** no hub DO. Fontes C++ = **CP1252** (`REGRA_CODIFICACAO.md`).
 
-> **Objetivo deste documento:** checklist executável do que falta **depois** do aceite local (template + PDF Cloud API no celular).  
-> Documento irmão: `ROTEIRO_COMPLETO_DESENVOLVIMENTO_WHATSAPP_META_PH.md`.  
-> **Regra:** só APIs oficiais Meta. App Secret **somente** no hub DO.
-
----
-
-## 0. Estado comprovado (22/09/2026 — revisao pos-prints Meta/DO)
-
-| Item | Status |
-|------|--------|
-| Push GitHub (agente + hub + templates resolve) | **Feito** — ate `a2957f9` (+ painel React nesta sessao, push pendente) |
-| Agente local `APP_ROLE=agent` `:8765` | **OK** |
-| Seed token System User + `CONNECTED` | **OK** |
-| Template APPROVED (`3p_direct_integration_test_template` / alias `lp_`) | **OK** |
-| PDF `Orcamento-5822371.pdf` → WhatsApp | **OK** (`ACCEPTED`) |
-| Painel ticket HMAC | **OK** |
-| Painel **React + Vite + Tailwind** (`web/`) | **Feito** — `web/dist` servido pelo FastAPI |
-| Meta App `PH_Softwares` / `META_APP_ID` | **Confirmado** `2053406131958490` |
-| `META_EMBEDDED_SIGNUP_CONFIG_ID` | **Ainda nao criado** (N4) |
-| DO `DATABASE_URL` | **OK** `${dev-db-085123.DATABASE_URL}` |
-| DO `META_APP_SECRET` / `META_WEBHOOK_VERIFY_TOKEN` | **Encrypted OK** |
-| DO `HUB_PULL_SECRET` | **VAZIO no DO** — colar o valor do `.env` local |
-| DO `META_APP_ID` | **Adicionar** `2053406131958490` |
-| SQL no Postgres DO (`001`/`002`) | **Pendente** (causa tipica de `db_ok:false`) |
-| Codigo hub poller / events | **No repo** — validar apos secret + SQL |
-| Embedded Signup live | **Scaffold so** |
-| Instalador Windows | **Codigo Inno/NSSM** — `.exe` pendente |
-| PHVCL / GEPH | **Em andamento** — falta Rebuild `PH.bpl` no BCB5 |
+Documento irmão: `ROTEIRO_COMPLETO_DESENVOLVIMENTO_WHATSAPP_META_PH.md`.  
+Checklist DO: `docs/CHECKLIST_HUB_DIGITALOCEAN.md`.  
+PHVCL: `docs/INTEGRACAO_PHVCL_WHATSMETA.md`.  
+**Produção instalador + GEPH (início→fim):** `ROTEIRO_PRODUCAO_INSTALADOR_GEPH_PHVCL.md`.
 
 ---
 
-## Decisao N3 — Painel web moderno
+## 0. Estado comprovado (evidência 22/09/2026)
 
-**Pedido:** FastAPI + React Vite, moderno e bonito. **Feito.**
-
-| Opcao | Status |
-|-------|--------|
-| Django + React | **Descartado** |
-| **FastAPI + React Vite + Tailwind** | **Implementado** em `web/` |
-| HTML legado | Fallback se `web/dist` ausente |
-
-```powershell
-cd C:\projetos\python\whatsmeta\web
-npm install
-npm run build
-cd ..
-uvicorn app.main:app --host 127.0.0.1 --port 8765
-python scripts\gen_panel_ticket.py ADMIN
-```
-
----
-
-## Onde encontrar `META_APP_ID` e `config_id` (N4)
-
-1. Meta Developers → App **PH_Softwares** → Configuracoes → Basico.
-2. **ID do Aplicativo** = `META_APP_ID` = **`2053406131958490`** (confirmado print 22/09/2026).
-3. `META_EMBEDDED_SIGNUP_CONFIG_ID`: criar Embedded Signup (ainda nao existe) e copiar Configuration ID.
-4. OAuth Redirect: `https://whatsapp-meta-ph-wzewk.ondigitalocean.app`
-5. DO: `META_APP_ID=2053406131958490` + config_id (N4) + App Secret Encrypted.
-6. Codigo: `app/hub/routes.py` + `app/config.py`.
-
-**Seguranca:** App Secret em print/chat → preferir Reset no Meta e atualizar so o DO. Nunca no Git/agente/C++.
+| Item | Status | Evidência |
+|------|--------|-----------|
+| GitHub `main` | **OK** | `ed859f2` — migrate hub + React panel + SQL 002/003 |
+| Hub `/health` | **OK** | `role=hub` `version=0.2.3` `db_ok=true` |
+| Hub schema Postgres | **Falha CREATE** | `schema_ok=false` — Dev DB user sem CREATE em `public` |
+| Hub eventos | **Fallback memória** | `events_backend=memory` — poller `200 OK` (não mais 500) |
+| `DATABASE_URL` DO | **OK** | `${whatsapp-meta-db.DATABASE_URL}` (não usar `dev-db-085123`) |
+| `HUB_PULL_SECRET` DO | **OK** | alinhado ao `.env` local — events autenticados |
+| `META_APP_SECRET` / verify token DO | **OK** | Encrypted |
+| `META_APP_ID` | **Confirmado** | `2053406131958490` (Meta Basic) — conferir se já está no env DO |
+| Agente local `:8765` | **OK** | `role=agent` `db_ok=true` `schema_ok=true` |
+| Poller → hub | **OK** | `GET /v1/hub/events` → `HTTP/1.1 200 OK` |
+| Seed / CONECTADO | **OK** | WABA `2147274472541752` telefone `+554984110604` |
+| Template smoke 17:54 | **OK envio** | `ACCEPTED` `3p_direct_integration_test_template` → `5549998185612` |
+| Status DELIVERED no painel (msg nova) | **Pendente / parcial** | Painel mostra ACCEPTED; msgs antigas READ/DELIVERED existem |
+| PDF Cloud API | **OK** (teste manhã) | `Orcamento-5822371` ACCEPTED |
+| Painel React Vite | **OK** | ticket GEPH, filtros, Conectado |
+| `META_EMBEDDED_SIGNUP_CONFIG_ID` | **Não criado** | N4 |
+| Instalador `.exe` | **Rascunho** | `installer/WHATSPH.iss` — falta empacotar `dist\whatsph` |
+| PHVCL código | **No disco** | `WhatsMetaClient` + `SenWA` + `USEUNIT` + `PH.bpk` |
+| `WhatsMetaClient.obj` / `PH.bpl` | **Existem** em `Lib\bpl` | Validar no BCB5 se GEPH linka sem Unresolved |
+| Menu GEPH / painel pelo GEPH | **Pendente** | N6.2 |
+| Neon / doadmin (schema persistente hub) | **Recomendado** | sem isso eventos somem no redeploy do hub |
 
 ---
 
-## Onde encontrar `DATABASE_URL` e `HUB_PULL_SECRET` (N1 / DO)
+## Decisão de stack (congelada)
 
-### DigitalOcean (evidencia print 22/09/2026)
-
-1. Apps → `whatsapp-meta-ph` → Settings → Environment Variables.
-2. `DATABASE_URL` = `${dev-db-085123.DATABASE_URL}` (**ja correto**).
-3. `HUB_PULL_SECRET` estava **vazio** → colar o valor do `.env` local do agente.
-4. Checklist: `docs/CHECKLIST_HUB_DIGITALOCEAN.md`.
-5. Aplicar SQL `001`+`002` no Postgres `dev-db-085123` → Redeploy → `/health` com `db_ok:true`.
-
-### Agente local
-
-```env
-HUB_BASE_URL=https://whatsapp-meta-ph-wzewk.ondigitalocean.app
-HUB_PULL_SECRET=<igual ao DO>
-META_APP_ID=2053406131958490
-DATABASE_URL=postgresql://...@127.0.0.1:12345/whatsapp_ph
-```
+| Tema | Decisão |
+|------|----------|
+| Painel | **FastAPI + React Vite + Tailwind** (`web/`) — Django descartado |
+| Hub | DigitalOcean App Platform `APP_ROLE=hub` |
+| Agente | Windows loopback `127.0.0.1:8765` `APP_ROLE=agent` |
+| Eventos hub sem CREATE | Fallback **memória** até Neon/doadmin |
+| C++ | Indy → agente; **sem** App Secret no BPL |
 
 ---
 
-## Ordem obrigatória (não pular)
+## Ordem obrigatória (atualizada)
 
 ```text
-N1  Deploy hub DO (status retorno)     ← HUB_PULL_SECRET + SQL DO agora
-N2  Validar poll status ponta a ponta
-N3  Painel React Vite                   ← FEITO (web/dist)
-N4  Embedded Signup + pairing (cliente)
-N5  Instalador WHATSPH (Windows)
-N6  PHVCL + GEPH                        ← Rebuild PH.bpl
-N7  Templates produto + piloto + App Review
+N1  Hub DO                          ← FEITO (db_ok + secret); schema Postgres PENDENTE
+N2  Poll status ponta a ponta       ← PARCIAL (200 OK; DELIVERED da msg 17:54 a confirmar)
+N3  Painel React                    ← FEITO
+N4  Embedded Signup + pairing       ← PENDENTE (produto multi-cliente)
+N5  Instalador WHATSPH              ← PRÓXIMO BLOCO PRODUÇÃO WINDOWS
+N6  PHVCL + GEPH                    ← PRÓXIMO BLOCO PRODUÇÃO DESKTOP
+N7  Templates produto + piloto      ← após N5/N6 mínimos
 ```
 
----
-
-## N1 — Hub DigitalOcean: retorno de status (Meta → DO → agente)
-
-### Por que esta fase agora
-A Meta **não** chama `localhost`. Status (sent/delivered/read/failed) chega só no webhook HTTPS do hub. O agente já tem poller; falta o hub em produção com as mesmas variáveis e o schema no Postgres DO.
-
-### N1.1 — Variáveis no App DO (`whatsapp-meta-ph`)
-
-Garantir (Encrypted onde fizer sentido):
-
-| Variável | Obrigatório | Nota |
-|----------|-------------|------|
-| `APP_ROLE` | **Sim** | `hub` (Procfile já prefixa; confirme no DO) |
-| `APP_ENV` | Sim | `production` |
-| `LOG_LEVEL` | Sim | `INFO` |
-| `META_WEBHOOK_VERIFY_TOKEN` | Sim | Já existe |
-| `META_APP_SECRET` | Sim | Já existe — HMAC obrigatório no código atual |
-| `DATABASE_URL` | Sim | Postgres gerenciado DO |
-| `HUB_PULL_SECRET` | **Sim — novo** | Mesmo valor no `.env` do agente local |
-| `GRAPH_API_VERSION` | Recomendado | `v25.0` |
-| `META_APP_ID` | Depois (N4) | Embedded Signup |
-| `META_EMBEDDED_SIGNUP_CONFIG_ID` | Depois (N4) | Embedded Signup |
-
-**Não** colocar `META_ACCESS_TOKEN` no DO (token de envio fica no agente / pairing).
-
-### N1.2 — Schema no Postgres do DigitalOcean
-
-No banco apontado por `DATABASE_URL` do DO, aplicar **o mesmo** `sql/001_whatsapp_ph.sql` (no mínimo a tabela `whatsapp_webhook_event`).
-
-Checklist:
-
-1. Conectar no Postgres DO (connection string do painel DO).  
-2. `\dt` — ver se `whatsapp_webhook_event` existe.  
-3. Se não: rodar `001_whatsapp_ph.sql`.  
-4. Confirmar: `SELECT COUNT(*) FROM whatsapp_webhook_event;`
-
-### N1.3 — Deploy do `main` atual
-
-1. DigitalOcean App → redeploy a partir do GitHub `danrleinascimento/whatsapp-meta-ph` branch `main`.  
-2. Aguardar Healthy.  
-3. Testar:  
-   `GET https://whatsapp-meta-ph-wzewk.ondigitalocean.app/health`  
-   Esperado: `"role":"hub"`, `db_ok: true` (se `DATABASE_URL` ok).
-
-### N1.4 — Webhook Meta (já verificado — revalidar)
-
-Callback continua:  
-`https://whatsapp-meta-ph-wzewk.ondigitalocean.app/webhook/whatsapp`
-
-Campos: pelo menos `messages` (statuses vêm nesse campo).
-
-### N1.5 — Agente local: alinhar poll
-
-No `.env` do PC/dev (e depois no cliente):
-
-```env
-HUB_BASE_URL=https://whatsapp-meta-ph-wzewk.ondigitalocean.app
-HUB_PULL_SECRET=<mesmo_valor_do_DO>
-POLL_INTERVAL_SECONDS=10
-```
-
-Reiniciar uvicorn agente. Logs devem mostrar poller ativo; sem `waba_id` na config o poll **pula** (regra atual).
-
-### N1.6 — Teste de aceite N1 (obrigatório)
-
-1. Enviar template ou PDF pelo agente (já sabemos que funciona).  
-2. Anotar `meta_message_id` (resposta JSON / tabela `whatsapp_message`).  
-3. No Postgres **DO**:  
-   `SELECT id, waba_id, field_name, received_at FROM whatsapp_webhook_event ORDER BY id DESC LIMIT 10;`  
-   Deve aparecer evento após a Meta notificar.  
-4. No Postgres **local**:  
-   `SELECT id, status, meta_message_id, updated_at FROM whatsapp_message WHERE meta_message_id = '...';`  
-   Status deve evoluir: `ACCEPTED` → `SENT` / `DELIVERED` / `READ` (conforme Meta).  
-5. Painel (`gen_panel_ticket`) mostra o status novo.
-
-**Aceite N1:** status muda no DB/painel **sem** o escritório configurar webhook.
-
-### N1.7 — Melhorias de código (se o aceite falhar / polish)
-
-Implementar só com evidência de falha:
-
-| # | Tarefa |
-|---|--------|
-| N1.7a | Persistir `since` do poller em disco/DB (hoje zera ao reiniciar) |
-| N1.7b | Idempotência webhook por `wamid`+status (evitar linhas duplicadas) |
-| N1.7c | Tabela hub de pairing em Postgres (hoje `_PAIRING` em memória — ok single worker) |
-| N1.7d | Log estruturado quando pull retorna 401 (secret errado) |
+**Ordem prática de produção agora:** N6.1b validar BPL → N5 instalador → N2 fechar DELIVERED → N4 → N7.
 
 ---
 
-## N2 — Validação ponta a ponta do retorno (checklist operacional)
+## N1 — Hub DigitalOcean
 
-Repetir N1.6 em dois cenários:
+### Feito
+- Binding DB: `${whatsapp-meta-db.DATABASE_URL}`
+- `HUB_PULL_SECRET` + poller autenticado
+- Deploy v0.2.3: migrate no startup + `POST /v1/hub/migrate` + fallback memória
+- `/health`: `db_ok=true`
 
-| Cenário | Ação | Esperado |
-|---------|------|----------|
-| A | Template utility | Status até DELIVERED/READ |
-| B | PDF document | Idem |
-| C | Número inválido / falha Meta | `FAILED` + `error_code` no local |
-| D | Reiniciar agente no meio | Após N1.7a: continua do `since`; sem isso: reprocessa (status idempotente ok) |
+### Ainda aberto
+1. **Schema persistente** — usuário `whatsapp-meta-db` não cria tabelas (`permission denied for schema public`). Opções:
+   - Neon (ou Managed PG em região com `doadmin`) → trocar `DATABASE_URL` do App → redeploy → `schema_ok=true`
+   - ou `doadmin` + `scripts/apply_sql_doadmin.py`
+2. Confirmar `META_APP_ID=2053406131958490` e `GRAPH_API_VERSION=v25.0` no env do Web Service.
+3. Webhook Meta callback: `https://whatsapp-meta-ph-wzewk.ondigitalocean.app/webhook/whatsapp` (campo `messages`).
 
-Documentar prints/SQL no chat ou em `ajustes` do projeto quando passar.
-
----
-
-## N3 — Painel WHATSPH (UI moderna) — IMPLEMENTADO
-
-Stack: **FastAPI + React + Vite + Tailwind** em `web/`. Brand WHATSPH / PH Softwares (teal + Sora/IBM Plex). Ticket GEPH obrigatório.
-
-| # | Tarefa | Status |
-|---|--------|--------|
-| N3.1 | Validar status DELIVERED após N1 | Pendente (depende DO) |
-| N3.2 | Scaffold React+Vite+Tailwind `web/` | **Feito** |
-| N3.3 | Build `dist/` + agente serve `/` e `/assets` | **Feito** |
-| N3.4 | Filtros status + busca | **Feito** |
-| N3.5 | Sessão `/v1/panel/session` (conectado / telefone) | **Feito** |
-| N3.6 | GEPH abre URL com ticket | Com N6 (`CreatePanelTicket`) |
-
-**Aceite N3:** `python scripts\gen_panel_ticket.py ADMIN` → browser mostra UI React com histórico.
+### Aceite N1 completo
+- [x] hub Healthy + `db_ok`
+- [x] poller 200
+- [ ] `schema_ok=true` **ou** aceite explícito do fallback memória em piloto interno
+- [ ] status da mensagem nova evolui no painel (N2)
 
 ---
 
-## N4 — Embedded Signup + pairing (WhatsApp **do cliente**)
+## N2 — Validação ponta a ponta
 
-Hoje o envio usa token PH Softwares (dev). Produto exige WABA do escritório.
+| Cenário | Status |
+|---------|--------|
+| A Template utility ACCEPTED | **OK** (17:54) |
+| A→ DELIVERED/READ no painel | **A confirmar** (atualizar painel; ver se celular recebeu) |
+| B PDF | **OK** manhã (ACCEPTED) |
+| C Falhas Meta 132001 / 131058 | **OK** (aparecem no painel) |
+| D Poller após restart hub | Memória zera — esperar Neon |
 
-Fontes: [Embedded Signup](https://developers.facebook.com/docs/whatsapp/embedded-signup/) · [Implementation](https://developers.facebook.com/docs/whatsapp/embedded-signup/implementation/).
-
-| # | Tarefa |
-|---|--------|
-| N4.1 | Meta App: Login for Business + Embedded Signup `config_id` |
-| N4.2 | Domínios OAuth / Valid OAuth Redirect = URL do hub DO |
-| N4.3 | Env DO: `META_APP_ID`, `META_EMBEDDED_SIGNUP_CONFIG_ID`, `META_APP_SECRET` |
-| N4.4 | Página `/onboarding?installation_id=` (scaffold já existe) — completar fluxo sessionInfo |
-| N4.5 | `POST /v1/hub/embedded-signup/exchange` — code→token (já scaffold) |
-| N4.6 | `POST /{WABA}/subscribed_apps` após signup |
-| N4.7 | `POST /{PHONE}/register` se necessário (pular se Coexistence / já registrado) |
-| N4.8 | Pairing: `pair_code` → agente `POST /v1/whatsapp/pairing/claim` → token cifrado em `whatsapp_config` |
-| N4.9 | Orientar pagamento na WABA **do cliente** |
-| N4.10 | Coexistence (opcional): `featureType: whatsapp_business_app_onboarding` + webhooks `history` / `smb_*` — fallback número só Cloud API |
-| N4.11 | Iniciar Tech Provider / App Review / Advanced Access (Meta) |
-
-**Aceite N4:** escritório piloto conecta sem ver DigitalOcean; envio usa token **dele**.
+Se ACCEPTED não virar DELIVERED e o celular **recebeu**: webhook Meta → hub (HMAC / campo) ou evento perdido na memória. Checar Runtime Logs do App + `/health` `events_memory_count`.
 
 ---
 
-## N5 — Instalador Windows (`{PHSFTW}\WHATSPH\`)
+## N3 — Painel — FEITO
 
-| # | Tarefa |
-|---|--------|
-| N5.1 | Inno Setup: pasta PHSFTW |
-| N5.2 | Copiar app + `.venv` embed / runtime Python 3.12 |
-| N5.3 | Criar DB `whatsapp_ph` + aplicar `sql/001_whatsapp_ph.sql` |
-| N5.4 | Gerar `installation_id`, `PH_API_KEY`, `TOKEN_ENCRYPTION_KEY`, `PANEL_TICKET_SECRET`, `HUB_PULL_SECRET` (ou claim no 1º start) |
-| N5.5 | `.env` com `APP_ROLE=agent`, `BIND` loopback `8765`, `HUB_BASE_URL` |
-| N5.6 | NSSM/WinSW serviço `PHWhatsMeta` — start automático, logs em `WHATSPH\logs\` |
-| N5.7 | Atalho “Painel” → só via GEPH ticket (atalho direto = 403, conforme Q-LOGIN) |
-| N5.8 | Teste Win10/11 + Server |
-
-**Aceite N5:** técnico sobe serviço; `/health` + `db_ok` sem instalar Python “na mão”.
+Aceite: ticket `gen_panel_ticket.py` → UI React, Conectado, histórico.  
+Pendente só N3.6 (abrir pelo menu GEPH).
 
 ---
 
-## N6 — PHVCL + GEPH (integração C++ Builder 5)
+## N4 — Embedded Signup (cliente conecta WABA dele)
 
-### Premissas congeladas
-- Encoding **CP1252** + CRLF (REGRA_CODIFICACAO GEPH).  
-- Fallback: se Meta **não** CONECTADO → Whats.exe atual.  
-- Login painel: **só ticket** gerado pelo GEPH (HMAC).  
-- PDF: paths sob PHSFTW / DiretorioPrincipal / Secundario.  
-- Fora da janela 24h: **template** + PDF (header document quando aplicável).
-
-### N6.1 — Cliente HTTP na PHVCL
-
-| # | Tarefa | Status 22/09/2026 |
-|---|--------|-------------------|
-| N6.1.1 | Unit `WhatsMetaClient` (Indy): base `http://127.0.0.1:8765` | **Feito** (`WhatsMetaClient.h/.cpp`, CP1252) |
-| N6.1.2 | Header `X-PH-Api-Key` (lido de `{root}\WHATSPH\.env`) | **Feito** |
-| N6.1.3 | Métodos: Health / status / SendDocument / CreatePanelTicket | **Feito** (SendTemplate/Batch depois) |
-| N6.1.4 | Timeout generoso em upload PDF | **Feito** (120s) |
-| N6.1.5 | Mapear erros Meta para PT | Parcial (detail JSON) |
-
-### N6.1b — Linker BCB5 (causa do Unresolved external)
-
-Erros `[Linker Error] Unresolved external 'TWhatsMetaClient::...' referenced from SENWA.OBJ` = `SenWA.cpp` chama a classe, mas o `.cpp` **não entrava** no pacote.
-
-Correção aplicada (CP1252 / REGRA_CODIFICACAO):
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `WhatsMetaClient.h` / `.cpp` | Implementação (já no disco; status SVN **added**) |
-| `SenWA.cpp` | `#include` + `enviarViaWhatsMeta` antes do Whats.exe |
-| `PH.cpp` | `USEUNIT("WhatsMetaClient.cpp");` antes de `USEFORM("SenWA.cpp"...` |
-| `PH.bpk` | `..\bpl\WhatsMetaClient.obj` em `OBJFILES` (antes de `SenWA.obj`) |
-| `Preview.cpp` | **Não** alterar (diff SVN era só comentário; mantido base) |
-
-**O que falta no IDE (você):**
-
-1. Fechar o diálogo “Can't load package … PH.bpl” (BPL antigo quebrado).  
-2. Abrir pacote `PH.bpk` no C++ Builder 5.  
-3. **Project → Build PH** (ou Rebuild).  
-4. Confirmar geração de `C:\CBuilder5\Projects\Lib\bpl\WhatsMetaClient.obj` e `PH.bpl`.  
-5. Só depois abrir o projeto GEPH / PH.exe que depende do BPL.
-
-Se o IDE não listar `WhatsMetaClient.cpp` no Project Manager: Add to Project → `WhatsMetaClient.cpp` → Rebuild.
-
-### N6.2 — UI / fluxos GEPH
-
-| # | Tarefa | Status |
-|---|--------|--------|
-| N6.2.1 | Menu: WhatsApp → Status / Conectar / Abrir painel | Pendente |
-| N6.2.2 | Conectar: browser hub `/onboarding?installation_id=` | Pendente (N4) |
-| N6.2.3 | Abrir painel: `CreatePanelTicket` → `ShellExecute` | Pendente |
-| N6.2.4 | Envio relatório: `SenWA` Meta → fallback Whats.exe | **Código feito** — validar após Build |
-| N6.2.5 | Boletos / RLBol: lote `send-batch` | Pendente |
-| N6.2.6 | Passar usuario/dirs/paths | **Feito** em `SenWA` |
-| N6.2.7 | Reusar `PermiteEnviarWhats` | Conferir |
-| N6.2.8 | Compilar `PH.bpl` + GEPH | **Fazer no BCB5 agora** |
-
-### N6.3 — Aceite N6
-
-- [ ] `PH.bpl` compila sem Unresolved external `TWhatsMetaClient`  
-- [ ] Status CONECTADO no menu  
-- [ ] PDF/boleto chega via Meta pelo SenWA/Preview  
-- [ ] Desconectado → Whats.exe intacto  
-- [ ] Painel abre só com ticket do GEPH  
+Pendente inteiro. Bloqueia piloto multi-escritório.  
+`META_APP_ID` já conhecido; falta `config_id` + OAuth redirect + App Review.
 
 ---
 
-## N7 — Templates de produto, limites, piloto, App Review
+## N5 — Instalador Windows (produção WHATSPH) — PASSO A PASSO
 
-| # | Tarefa |
-|---|--------|
-| N7.1 | Modelo utility “boleto/relatório” (doc para escritório aprovar na WABA dele) |
-| N7.2 | Não usar `hello_world` em número comercial (erro 131058) |
-| N7.3 | Sempre listar/resolver via `/v1/whatsapp/templates` (já no agente) |
-| N7.4 | Mensagens de erro: 132001, 131058, 130497, 131056 (pair rate) |
-| N7.5 | Manual usuário: conectar, pagamento, templates |
-| N7.6 | Manual técnico: instalador, portas, logs, `HUB_PULL_SECRET` |
-| N7.7 | Piloto 1–2 escritórios |
-| N7.8 | Verificação empresa Meta + App Review Tech Provider conforme escala |
+**Objetivo:** técnico instala em `{PHSFTW}\WHATSPH\` sem Python “na mão”; serviço `PHWhatsMeta` sobe `:8765`.
 
----
+### N5.A — Pré-requisitos (dev PH)
 
-## Critérios de aceite finais (produto v1)
-
-- [ ] Escritório instala WHATSPH sem configurar Meta Developers  
-- [ ] Conecta WhatsApp **dele** (Embedded Signup)  
-- [ ] Envia relatório/boleto (template + PDF) pelo GEPH  
-- [ ] Painel local: histórico + status (retorno via hub)  
-- [ ] Dois escritórios isolados (tokens/WABAs distintos)  
-- [ ] Fallback Whats.exe se desconectado  
-- [ ] App Secret nunca no C++ / pacote cliente  
-
----
-
-## Plano de implementação sugerido (sprints)
-
-| Sprint | Escopo | Saída |
-|--------|--------|-------|
-| **S1** | N1 + N2 | Status DELIVERED no painel local via poll DO |
-| **S2** | N3 polish mínimo | Filtros/detalhe se necessário |
-| **S3** | N4 | Piloto conecta WABA própria |
-| **S4** | N5 | Instalador + serviço Windows |
-| **S5** | N6 | GEPH envia pelo Preview Meta |
-| **S6** | N7 | Template produto + piloto + Review |
-
----
-
-## Comandos úteis (dev)
+1. Inno Setup 6 instalado.
+2. Postgres do cliente acessível (ou instalar Postgres/serviço PH já existente na porta usada pelo escritório).
+3. Build do agente empacotável:
 
 ```powershell
 cd C:\projetos\python\whatsmeta
-.\.venv\Scripts\activate
-
-# Agente
-uvicorn app.main:app --host 127.0.0.1 --port 8765
-
-# Templates oficiais da WABA
-python scripts\list_templates.py
-
-# Envio
-python scripts\smoke_test.py --send-template --to 5549XXXXXXXXX
-
-# Painel
-python scripts\gen_panel_ticket.py ADMIN
+# garantir web/dist atualizado
+cd web; npm ci; npm run build; cd ..
+# pasta de distribuição (exemplo)
+mkdir dist\whatsph -Force
+# copiar: app\, sql\, web\dist\, scripts\apply_sql.py, requirements.txt, installer\*.bat
+# criar .venv embutido OU python embed + pip install -r requirements.txt dentro de dist\whatsph
 ```
 
-Hub local (só se precisar debugar papel hub):
+4. Ajustar `installer/WHATSPH.iss`:
+   - `#define MyAppVersion "0.2.3"`
+   - `Source` apontando para `dist\whatsph\*`
+5. Completar `installer/install_service.bat` (NSSM):
+   - `nssm install PHWhatsMeta ...\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8765`
+   - AppDirectory = `{PHSFTW}\WHATSPH`
+   - logs → `WHATSPH\logs\`
+6. `apply_sql.bat`: `python scripts\apply_sql.py` com `DATABASE_URL` do cliente (DB `whatsapp_ph` local).
 
-```powershell
-$env:APP_ROLE='hub'
-uvicorn app.main:app --host 127.0.0.1 --port 8000
+### N5.B — Conteúdo do `.env` gerado no 1º install
+
+```env
+APP_ROLE=agent
+APP_ENV=production
+BIND_HOST=127.0.0.1
+PORT=8765
+INSTALLATION_ID=<uuid>
+DATABASE_URL=postgresql://.../whatsapp_ph
+PH_API_KEY=<gerado>
+TOKEN_ENCRYPTION_KEY=<gerado>
+PANEL_TICKET_SECRET=<gerado>
+HUB_BASE_URL=https://whatsapp-meta-ph-wzewk.ondigitalocean.app
+HUB_PULL_SECRET=<mesmo do hub DO — valor de fábrica PH>
+GRAPH_API_VERSION=v25.0
+PHSFTW_ROOT=C:\PHSFTW
 ```
+
+**Não** embutir `META_APP_SECRET` nem `META_ACCESS_TOKEN` no instalador.
+
+### N5.C — Compilar e testar
+
+1. Abrir `WHATSPH.iss` no Inno → Compile → `WHATSPH_Setup_0.2.3.exe`
+2. Instalar em VM Win10/11 limpa (ou pasta teste)
+3. Aceite:
+   - [ ] Serviço `PHWhatsMeta` Running
+   - [ ] `http://127.0.0.1:8765/health` → `role=agent` `db_ok=true`
+   - [ ] Abrir `/?` sem ticket → 403 / tela bloqueada
+   - [ ] Ticket via API → painel React
+
+### N5.D — Entrega ao escritório
+
+1. Rodar Setup como admin  
+2. Garantir Postgres + SQL  
+3. Conectar WhatsApp (hoje: seed/dev PH; produção: N4 Embedded Signup)  
+4. GEPH já apontando `DiretorioPrincipal` / PHSFTW  
 
 ---
 
-## Riscos (não esquecer)
+## N6 — PHVCL + GEPH (produção desktop) — PASSO A PASSO
+
+### Premissas
+- CP1252 + CRLF  
+- Meta se CONECTADO; senão Whats.exe  
+- Painel só com ticket HMAC  
+
+### N6.A — Build PH.bpl (você no BCB5) — FAZER AGORA
+
+Estado disco (22/09 17:57): `WhatsMetaClient.obj` e `PH.bpl` **existem**. Ainda assim validar no IDE:
+
+1. Abrir `C:\CBuilder5\Projects\Lib\phvcl\PH.bpk`
+2. Confirmar no Project Manager: `WhatsMetaClient.cpp`
+3. **Project → Build PH** (Rebuild se linker antigo)
+4. Sem `Unresolved external 'TWhatsMetaClient::...'`
+5. Commit SVN PH Softwares (não misturar UTF-8): `WhatsMetaClient.*`, `SenWA.cpp`, `PH.cpp`, `PH.bpk`
+
+### N6.B — Build GEPH
+
+1. Abrir projeto GEPH que depende de `PH.bpl`
+2. Rebuild GEPH / PH.exe  
+3. Garantir runtime: serviço WHATSPH + `{PHSFTW}\WHATSPH\.env` com `PH_API_KEY`
+
+### N6.C — Fluxos mínimos produção (código a completar)
+
+| # | Tarefa | Status |
+|---|--------|--------|
+| N6.C.1 | Envio relatório SenWA → Meta → fallback Whats.exe | Código **feito** — teste no exe |
+| N6.C.2 | Menu WhatsApp → Abrir painel (`CreatePanelTicket` + ShellExecute) | **Implementar** |
+| N6.C.3 | Menu Status / Conectar (N4 onboarding) | Após N4 |
+| N6.C.4 | Lote boletos `send-batch` | Depois do aceite SenWA |
+| N6.C.5 | `PermiteEnviarWhats` | Conferir permissão existente |
+
+### N6.D — Aceite GEPH
+
+- [ ] Rebuild sem Unresolved `TWhatsMetaClient`
+- [ ] Relatório PDF chega no WhatsApp via Meta com agente CONECTADO
+- [ ] Agente parado → Whats.exe continua funcionando
+- [ ] Menu abre painel com ticket (não URL crua sem ticket)
+
+---
+
+## N7 — Produto / piloto
+
+Templates utility do escritório, manuais, App Review, Tech Provider — após N5+N6 mínimos e idealmente N4.
+
+---
+
+## Riscos atualizados
 
 | Risco | Mitigação |
 |-------|-----------|
-| Postgres DO sem tabela webhook | N1.2 antes de validar poll |
-| `HUB_PULL_SECRET` diferente DO vs agente | 401 no poller — alinhar |
-| Token no print/chat | Rotacionar System User token |
-| `hello_world` em número real | Usar template APPROVED da WABA |
-| Pairing em memória no hub | Single worker DO; depois tabela Postgres |
-| App Review / Tech Provider | Começar N4.11 cedo |
-| Graph v20 EOL | Manter `v25.0` |
+| Dev DB sem CREATE | Neon/doadmin **ou** aceitar memória só em lab |
+| Eventos memória somem no redeploy hub | Neon antes de piloto externo |
+| ACCEPTED sem DELIVERED | Verificar webhook Meta + logs DO + celular |
+| Encoding C++ UTF-8 | Só editar CP1252 / scripts `patch_*_cp1252.py` |
+| Secret no chat/print | Rotacionar App Secret / senha DB se vazou |
+| `hello_world` | Nunca em número real (131058) |
 
 ---
 
-## Próxima sessão de implementação (imediato)
+## Próximos passos imediatos (produção)
 
-1. **DO agora (você):**  
-   - Adicionar `HUB_PULL_SECRET` = valor do `.env` local  
-   - Adicionar `META_APP_ID=2053406131958490`  
-   - Aplicar `sql/001` + `sql/002` no Postgres `dev-db-085123`  
-   - Redeploy → confirmar `/health` com `db_ok: true`  
-2. **N6.1b** — Rebuild `PH.bpl` no C++ Builder 5.  
-3. **N1.5–N1.6** — provar status DELIVERED no painel React.  
-4. Depois: N4 (`config_id` Embedded Signup) / N5 / restante N6.
+### Bloco A — Desktop (esta semana)
+1. **BCB5:** Rebuild `PH.bpl` + Rebuild GEPH  
+2. Testar envio relatório pelo form SenWA com agente rodando  
+3. Implementar botão/menu **Abrir painel WHATSPH** (ticket)  
+4. SVN commit PHVCL (CP1252)
 
-**Fim do roteiro de próximos passos.**
+### Bloco B — Instalador (em paralelo)
+1. Montar `dist\whatsph` (app + venv/embed + `web\dist` + sql)  
+2. NSSM em `install_service.bat`  
+3. Compilar Inno `WHATSPH_Setup_0.2.3.exe`  
+4. Teste VM limpa
+
+### Bloco C — Hub persistente (antes de piloto cliente)
+1. Postgres com CREATE (Neon ou doadmin)  
+2. Confirmar `/health` → `schema_ok=true` `events_backend=postgres`  
+3. Fechar N2: template novo → DELIVERED no painel
+
+### Bloco D — Depois
+1. N4 Embedded Signup  
+2. N7 templates + manuais + piloto  
+
+**Fim do roteiro revisado 22/09/2026 17:57.**
