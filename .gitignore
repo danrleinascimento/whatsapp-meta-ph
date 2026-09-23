@@ -35,4 +35,4 @@ web/dist-ssr/
 # web/dist versionado (agente serve sem npm)
 
 # Empacote instalador (gerado por scripts/build_dist.ps1)
-dist/
+/dist/
