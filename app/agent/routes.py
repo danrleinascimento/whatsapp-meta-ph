@@ -142,6 +142,10 @@ def api_send_document(
             diretorio_secundario=body.diretorio_secundario,
             sistema_origem=body.sistema_origem,
             usuario_geph=body.usuario_geph,
+            force_session=body.force_session,
+            body_name=body.body_name,
+            body_detail=body.body_detail,
+            envio_tipo=body.envio_tipo,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

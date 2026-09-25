@@ -297,8 +297,12 @@ window.fbAsyncInit = function() {{
 }};
 function launchWhatsAppSignup() {{
   const msg = document.getElementById('msg');
-  if (!APP_ID || !CONFIG_ID) {{
-    msg.textContent = 'Cadastro WhatsApp ainda não está liberado no servidor. Fale com o suporte PH Softwares.';
+  if (!APP_ID) {{
+    msg.textContent = 'Cadastro WhatsApp ainda não está liberado no servidor (aplicativo Meta sem ID). Fale com o suporte PH Softwares.';
+    return;
+  }}
+  if (!CONFIG_ID) {{
+    msg.textContent = 'Cadastro WhatsApp ainda não está liberado no servidor (falta o Configuration ID do Embedded Signup no hub). Enquanto isso, se a Situação do WhatsApp no GEPH já mostra conta conectada, o envio de boletos já pode ser usado.';
     return;
   }}
   FB.login(function(response) {{

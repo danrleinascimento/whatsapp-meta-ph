@@ -34,6 +34,14 @@ class Settings(BaseSettings):
     batch_delay_seconds: float = 0.05
     pair_rate_min_seconds: float = 6.0
 
+    # Template utility com header DOCUMENT para boleto fora da janela 24h (Meta).
+    # Criar/aprovar via scripts/create_boleto_template.py ou WhatsApp Manager.
+    whatsapp_boleto_template_name: str = "ph_boleto_pdf"
+    whatsapp_boleto_template_lang: str = "pt_BR"
+    # Preview avulso (nao boleto em grupo): header DOCUMENT + nome do relatorio.
+    whatsapp_relatorio_template_name: str = "ph_relatorio_pdf"
+    whatsapp_relatorio_template_lang: str = "pt_BR"
+
     # Seed / dev PH Softwares (nunca logar o token)
     meta_access_token: str = ""
     meta_phone_number_id: str = ""

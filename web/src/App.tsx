@@ -9,7 +9,7 @@ const STATUS_OPTS = ['TODOS', 'ACCEPTED', 'SENT', 'DELIVERED', 'READ', 'FAILED']
 function statusLabel(status?: string): string {
   switch ((status || '').toUpperCase()) {
     case 'ACCEPTED':
-      return 'Aceito'
+      return 'Aceito pela Meta'
     case 'SENT':
       return 'Enviado'
     case 'DELIVERED':

@@ -28,6 +28,7 @@ Desktop.ini
 *.key
 secrets/
 local_data/
+logs_agent_*.txt
 
 # Frontend
 web/node_modules/

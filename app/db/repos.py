@@ -149,6 +149,8 @@ def update_message_status_by_meta_id(
     error_code: Optional[str] = None,
     error_message: Optional[str] = None,
 ) -> int:
+    # Nao rebaixa: READ e FAILED sao finais. ACCEPTED pode virar SENT,
+    # DELIVERED ou READ. Um "sent" atrasado nao apaga um "read".
     return execute(
         """
         UPDATE whatsapp_message SET
@@ -157,8 +159,28 @@ def update_message_status_by_meta_id(
           error_message = COALESCE(%s, error_message),
           updated_at = CURRENT_TIMESTAMP
         WHERE meta_message_id = %s
+          AND (
+            CASE status
+              WHEN 'ACCEPTED' THEN 1
+              WHEN 'SENT' THEN 2
+              WHEN 'DELIVERED' THEN 3
+              WHEN 'READ' THEN 4
+              WHEN 'FAILED' THEN 4
+              ELSE 0
+            END
+          ) <= (
+            CASE %s
+              WHEN 'ACCEPTED' THEN 1
+              WHEN 'SENT' THEN 2
+              WHEN 'DELIVERED' THEN 3
+              WHEN 'READ' THEN 4
+              WHEN 'FAILED' THEN 4
+              ELSE 0
+            END
+          )
+          AND NOT (status IN ('READ', 'FAILED') AND status <> %s)
         """,
-        (status, error_code, error_message, meta_message_id),
+        (status, error_code, error_message, meta_message_id, status, status),
     )
 
 

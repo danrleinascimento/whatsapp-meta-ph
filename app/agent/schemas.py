@@ -32,6 +32,12 @@ class SendDocumentRequest(BaseModel):
     diretorio_secundario: Optional[str] = None
     sistema_origem: Optional[str] = "GEPH"
     usuario_geph: Optional[str] = None
+    # False (padrao): usa template APPROVED do envio_tipo; senao sessao + warning.
+    force_session: bool = False
+    body_name: Optional[str] = None
+    body_detail: Optional[str] = None
+    # boleto = grupo de boletos; relatorio = Preview avulso (SenWA).
+    envio_tipo: str = "boleto"
 
 
 class BatchItem(BaseModel):

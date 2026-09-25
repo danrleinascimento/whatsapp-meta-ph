@@ -33,12 +33,13 @@ def list_message_templates(
     status: Optional[str] = None,
     limit: int = 100,
     timeout: float = 60.0,
+    fields: str = "name,language,status,category,id,components",
 ) -> list[dict[str, Any]]:
     """GET /{WABA_ID}/message_templates — retorna lista (name, language, status, ...)."""
     url = f"{_base_url()}/{waba_id}/message_templates"
     params: dict[str, Any] = {
         "limit": limit,
-        "fields": "name,language,status,category,id",
+        "fields": fields,
     }
     if name:
         params["name"] = name

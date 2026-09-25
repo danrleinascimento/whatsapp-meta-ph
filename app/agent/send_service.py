@@ -155,7 +155,21 @@ def send_document(
     diretorio_secundario: Optional[str] = None,
     sistema_origem: Optional[str] = None,
     usuario_geph: Optional[str] = None,
+    force_session: bool = False,
+    body_name: Optional[str] = None,
+    body_detail: Optional[str] = None,
+    envio_tipo: str = "boleto",
 ) -> dict[str, Any]:
+    """Envia PDF.
+
+    Regra oficial Meta (Cloud API / service messages):
+    - Dentro da janela 24h: mensagem livre tipo ``document`` OK.
+    - Fora da janela 24h: obrigatorio template aprovado (utility) com header DOCUMENT.
+
+    envio_tipo:
+    - ``boleto``: template ph_boleto_pdf (grupo de boletos).
+    - ``relatorio``: template ph_relatorio_pdf (Preview avulso / SenWA).
+    """
     settings = get_settings()
     to_wa = normalize_wa_id(to)
     pdf = resolve_allowed_pdf(
@@ -193,13 +207,74 @@ def send_document(
             "http_status": exc.http_status,
         }
 
+    tipo, tpl_name, tpl_lang = _resolve_envio_tipo(envio_tipo)
+    tpl = None if force_session else _approved_document_template(cfg, token, tpl_name, tpl_lang)
+    if tpl:
+        components: list[dict[str, Any]] = [
+            {
+                "type": "header",
+                "parameters": [
+                    {
+                        "type": "document",
+                        "document": {"id": media_id, "filename": pdf.name},
+                    }
+                ],
+            }
+        ]
+        nparams = _template_body_param_count(tpl)
+        if nparams >= 1:
+            if tipo == "relatorio":
+                texts = [_template_text_param(body_name or "relatorio")]
+            else:
+                texts = [_template_text_param(body_name or "")]
+                if nparams >= 2:
+                    texts.append(
+                        _template_text_param(body_detail or _caption_as_body_detail(caption))
+                    )
+            while len(texts) < nparams:
+                texts.append("-")
+            components.append(
+                {
+                    "type": "body",
+                    "parameters": [{"type": "text", "text": t} for t in texts[:nparams]],
+                }
+            )
+        payload = build_template_payload(
+            to_wa,
+            template_name=tpl["name"],
+            language_code=tpl["language"],
+            components=components,
+        )
+        result = _dispatch(
+            cfg=cfg,
+            installation_id=settings.installation_id,
+            msg_type="template",
+            to_wa_id=to_wa,
+            payload=payload,
+            template_name=tpl["name"],
+            caption=caption,
+            local_file_path=str(pdf),
+            media_id=media_id,
+            sistema_origem=sistema_origem,
+            usuario_geph=usuario_geph,
+            access_token=token,
+        )
+        result["delivery_mode"] = "template"
+        result["envio_tipo"] = tipo
+        result["template_resolved"] = {
+            "name": tpl["name"],
+            "language": tpl["language"],
+            "status": tpl.get("status"),
+        }
+        return result
+
     payload = build_document_payload(
         to_wa,
         media_id=media_id,
         caption=caption,
         filename=pdf.name,
     )
-    return _dispatch(
+    result = _dispatch(
         cfg=cfg,
         installation_id=settings.installation_id,
         msg_type="document",
@@ -212,6 +287,105 @@ def send_document(
         usuario_geph=usuario_geph,
         access_token=token,
     )
+    result["delivery_mode"] = "session"
+    result["envio_tipo"] = tipo
+    result["warning"] = (
+        "PDF enviado como mensagem de sessao (livre). "
+        "Pela regra oficial da Meta, fora da janela de 24h apos a ultima mensagem "
+        "do cliente a API pode aceitar (ACCEPTED) e o celular nao receber. "
+        f"Para envio sem mensagem recente do cliente, aguarde o modelo {tpl_name} "
+        "aprovado na Meta."
+    )
+    return result
+
+
+def _resolve_envio_tipo(envio_tipo: str) -> tuple[str, str, str]:
+    settings = get_settings()
+    tipo = (envio_tipo or "boleto").strip().lower()
+    if tipo == "relatorio":
+        name = (settings.whatsapp_relatorio_template_name or "ph_relatorio_pdf").strip()
+        lang = (settings.whatsapp_relatorio_template_lang or "pt_BR").strip()
+        return "relatorio", name, lang
+    name = (settings.whatsapp_boleto_template_name or "ph_boleto_pdf").strip()
+    lang = (settings.whatsapp_boleto_template_lang or "pt_BR").strip()
+    return "boleto", name, lang
+
+
+def _template_text_param(raw: str) -> str:
+    """Parametros de body do template nao podem ser vazios (Meta)."""
+    s = (raw or "").replace("\r", " ").replace("\n", " ").strip()
+    if not s:
+        return "-"
+    return s[:1024]
+
+
+def _caption_as_body_detail(caption: Optional[str]) -> str:
+    if not caption:
+        return "-"
+    # Compacta caption multilinha do GEPH em um detalhe curto
+    line = " ".join(part.strip() for part in caption.replace("\r\n", "\n").split("\n") if part.strip())
+    return line[:1024] if line else "-"
+
+
+def _template_body_param_count(tpl: dict[str, Any]) -> int:
+    import re
+
+    for comp in tpl.get("components") or []:
+        if not isinstance(comp, dict):
+            continue
+        if str(comp.get("type") or "").upper() != "BODY":
+            continue
+        text = str(comp.get("text") or "")
+        return len(re.findall(r"\{\{\d+\}\}", text))
+    return 0
+
+
+def _approved_document_template(
+    cfg: dict,
+    token: str,
+    name: str,
+    lang: str,
+) -> Optional[dict[str, Any]]:
+    """Retorna template APPROVED com header DOCUMENT, ou None."""
+    from app.graph.templates import list_message_templates
+
+    name = (name or "").strip()
+    if not name:
+        return None
+    lang = (lang or "").strip() or None
+    waba = str(cfg.get("waba_id") or "")
+    if not waba:
+        return None
+    try:
+        rows = list_message_templates(
+            waba_id=waba,
+            access_token=token,
+            name=name,
+            language=lang,
+            status="APPROVED",
+        )
+    except Exception:
+        logger.exception("Falha ao listar template %s", name)
+        return None
+    for row in rows:
+        if str(row.get("name") or "") != name:
+            continue
+        if lang and str(row.get("language") or "") != lang:
+            continue
+        if str(row.get("status") or "").upper() != "APPROVED":
+            continue
+        has_doc_header = False
+        for comp in row.get("components") or []:
+            if not isinstance(comp, dict):
+                continue
+            if str(comp.get("type") or "").upper() != "HEADER":
+                continue
+            if str(comp.get("format") or "").upper() == "DOCUMENT":
+                has_doc_header = True
+                break
+        if has_doc_header:
+            return row
+    return None
 
 
 def send_batch(items: list[dict[str, Any]]) -> dict[str, Any]:
