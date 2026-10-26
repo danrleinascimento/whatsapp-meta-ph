@@ -35,5 +35,6 @@ web/node_modules/
 web/dist-ssr/
 # web/dist versionado (agente serve sem npm)
 
-# Empacote instalador (gerado por scripts/build_dist.ps1)
+# whatsph.exe e arquivos de build do PyInstaller (scripts/build_exe.ps1)
 /dist/
+/build/

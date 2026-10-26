@@ -3,10 +3,12 @@ from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.caminhos import env_file
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(env_file()),
         env_file_encoding="utf-8",
         extra="ignore",
     )

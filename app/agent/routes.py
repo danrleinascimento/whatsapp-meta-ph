@@ -18,12 +18,13 @@ from app.agent.schemas import (
     TicketRequest,
 )
 from app.agent import send_service
+from app.caminhos import resource_dir
 from app.config import get_settings
 from app.db import repos
 
 router = APIRouter(tags=["agent"])
 
-_WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
+_WEB_DIST = resource_dir() / "web" / "dist"
 _WEB_INDEX = _WEB_DIST / "index.html"
 
 

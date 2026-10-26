@@ -1,5 +1,7 @@
 # Roteiro completo de produção — Instalador WHATSPH + GEPH + PHVCL
 
+> **Substituído em 26/10/2026.** O instalador Inno Setup + NSSM descrito aqui foi removido do repositório (`installer\`, `scripts\build_dist.ps1`). O agente agora é o `whatsph.exe` em `PHSFTW\SERVICOS\WHATSPH`, que registra o próprio serviço `PHWhatsMeta`: ver `documentacao.md` seção 14. Este roteiro fica só como histórico.
+
 **Documento:** roteiro executável do início ao fim para colocar o WhatsApp Meta Cloud API em produção no escritório (serviço Windows + desktop GEPH).  
 **Criado:** 22/09/2026 · **Revisão implementação:** 23/09/2026  
 **Versão app:** `0.2.4`  

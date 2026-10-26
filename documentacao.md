@@ -2,7 +2,7 @@
 
 Documento para o próximo programador ou IA. Descreve o que o código faz, o que já está pronto, o que ainda falta e como ele se liga aos outros sistemas da PH Softwares.
 
-Data desta descrição: **25/09/2026**. Atualização em **19/10/2026**: porta do agente 8765 → 8767 (seção 13).  
+Data desta descrição: **25/09/2026**. Atualização em **19/10/2026**: porta do agente 8765 → 8767 (seção 13). Atualização em **26/10/2026**: `whatsph.exe` e serviço em `PHSFTW\SERVICOS\WHATSPH` (seção 14).  
 Código: `C:\projetos\python\whatsmeta`  
 Repositório: https://github.com/danrleinascimento/whatsapp-meta-ph  
 Hub em produção: https://whatsapp-meta-ph-wzewk.ondigitalocean.app  
@@ -25,7 +25,7 @@ Um único programa Python (FastAPI) com dois papéis, escolhidos pela variável 
 
 O GEPH (C++ Builder 5) **não** fala com a Meta. Ele fala só com o agente local. O agente fala com a Graph API e com o hub. A Meta fala só com o hub (URL pública).
 
-Nome interno do agente no escritório: **WHATSPH**. Serviço Windows: `PHWhatsMeta` (NSSM). Em 25/09/2026 o serviço estava **parado** e quem atendia a porta (então 8765) era o uvicorn do venv deste repositório.
+Nome interno do agente no escritório: **WHATSPH**. Serviço Windows: `PHWhatsMeta`, registrado pelo próprio `whatsph.exe` em `PHSFTW\SERVICOS\WHATSPH` desde 26/10/2026 (antes era NSSM; ver seção 14). Em 25/09/2026 o serviço estava **parado** e quem atendia a porta (então 8765) era o uvicorn do venv deste repositório.
 
 **Porta do agente: 8767 desde 19/10/2026** (antes 8765). A 8765 passou a ser do serviço HUPH (`C:\PHSFTW\SERVICOS\HUPH\huph.exe`, `127.0.0.1:8765`), usado pela Central RTPH. Detalhes na seção 13.
 
@@ -100,7 +100,7 @@ GEPH.exe  e outros sistemas PH que usam o mesmo PH.bpl
 | **Postgres local** | banco `whatsapp_ph` | Config, mensagens, estado do poller. O agente exige `schema_ok` |
 | **Postgres do hub** | gerenciado na DigitalOcean | Deveria ter `whatsapp_webhook_event`. Em 25/09/2026 o usuário do app **não** tem `CREATE` em `public`. Eventos ficam na memória do processo |
 | **Whats.exe** | `{PHSFTW}\UTEIS\Whats.exe` | Canal **antigo** (Chrome + WhatsApp Web). O GEPH só cai nele quando a conta oficial está desconectada. Não misturar com este projeto |
-| **Cópias de instalação** | `C:\PHSFTW\WHATSPH` e `D:\PHSFTW\WHATSPH` | `.env` recebeu as chaves dos modelos. O código em `D:\` **não** tem o `send_service.py` desta sessão. Não apontar o serviço NSSM para `D:\` enquanto o código novo não for copiado |
+| **Cópias de instalação** | `C:\PHSFTW\SERVICOS\WHATSPH` (atual, desde 26/10/2026); `C:\PHSFTW\WHATSPH` e `D:\PHSFTW\WHATSPH` (antigas, do NSSM) | A atual tem `whatsph.exe`, `.env` e `logs\`. As antigas não rodam mais nada; a de `C:` ainda guarda o `.env` que o GEPH sem Rebuild lê (mesmas chaves). Ver seção 14 |
 | **GitHub** | `danrleinascimento/whatsapp-meta-ph` | O commit antigo `82218a6` está em `main`. O trabalho do agente e do C++ desta sessão **não** foi enviado ao remoto (só commitar se o usuário pedir) |
 
 O GEPH guarda clientes em arquivo binário (`PHTable`), não neste Postgres. O telefone de 11 dígitos do cadastro (`CLI.WhatsApp`) é lido pelo C++ e enviado como `55` + 11 dígitos. A Graph API pode devolver `wa_id` sem o nono dígito. O aparelho de teste usado foi +55 49 99818-5612; no banco local o número é `5549998185612`.
@@ -321,3 +321,61 @@ Ordem prática quando o usuário voltar:
 **Cliente C++ (`Lib\phvcl\WhatsMetaClient.cpp` e `Lib\phvcl_nova\WhatsMetaClient.cpp`).** O construtor começa com `BaseUrl = "http://127.0.0.1:8765"`. `LoadFromWhatsPhEnv` troca a porta pela chave `PORT` do primeiro `.env` encontrado (`{PHSFTW}\WHATSPH\.env`, pastas acima, `C:\PHSFTW\WHATSPH\.env`, `D:\PHSFTW\WHATSPH\.env`). Por isso o GEPH não precisou ser recompilado: basta o `.env` ter `PORT=8767`. **Atenção:** se o `.env` não tiver `PORT`, o cliente fica no padrão 8765 e chama o HUPH, não o agente. Trocar esse padrão exige editar o `.cpp` (CP1252) e recompilar, o que não foi feito.
 
 **Ainda com 8765 (não alterados):** `web\vite.config.ts` (proxy do `npm run dev`), `scripts\smoke_test.py` (URL padrão), scripts antigos `scripts\patch_*.py`, `scripts\reapply_geph_meta_warning.py`, `scripts\verify_final_review.py`, `scripts\write_whatsmeta_ui_cp1252.py`, o log `logs_agent_stderr.txt` e a pasta de build `dist\whatsph`. Para subir o agente em desenvolvimento ao lado do serviço, usar outra porta livre; 8765 é do HUPH e 8767 é do serviço.
+
+---
+
+## 14. `whatsph.exe` e serviço em `PHSFTW\SERVICOS\WHATSPH` (26/10/2026)
+
+**Por quê.** O pedido foi seguir o modelo do HUPH (`C:\projetos\python\huph`): um único exe na pasta `PHSFTW\SERVICOS\<serviço>`, que roda o servidor e também instala e atualiza o próprio serviço do Windows. Antes, o agente era uma pasta com `.venv` + código solto, registrada pelo NSSM em `PHSFTW\WHATSPH` (instalador Inno `installer\WHATSPH.iss`).
+
+**Como ficou.**
+
+- `whatsph.exe` (PyInstaller, `whatsph.spec`, ícone `ph.ico`) leva dentro o Python, o código `app\`, `sql\` e `web\dist\` (painel). Versão **0.3.0**.
+- Pasta de instalação: `<PHSFTW>\SERVICOS\WHATSPH\` com `whatsph.exe`, `.env` e `logs\`. O exe sempre lê o `.env` ao lado dele (`app\caminhos.py`).
+- Serviço `PHWhatsMeta` registrado pelo próprio exe (pywin32, `app\servico_windows.py`), início automático, conta LocalSystem. O serviço roda `whatsph.exe run-server` como processo filho. Sem NSSM.
+- O agente escuta sempre em `127.0.0.1`. Porta: `PORT` do `.env`; sem `PORT`, 8767.
+- Logs: `logs\whatsph.log` (rotativo, 2 MB × 5) com tudo. `logs\whatsph-service.log` (sem rotação) só recebe erro fatal do processo filho: o log só vai para a tela quando o exe roda num console. A linha do `httpx` a cada consulta ao hub foi silenciada (nível WARNING).
+- Se o agente cair, o serviço o reinicia (como o NSSM fazia): 5 s, dobrando até 60 s se cair logo após subir; volta a 5 s depois de 60 s rodando. Cada queda gera um Aviso no log de Aplicativo do Windows (`PHWhatsMeta: agente encerrou ...`). No stop, o agente é encerrado mesmo se o stop chegar durante um reinício.
+
+**Comandos (`app\cli.py`).**
+
+| Comando | Faz |
+|---|---|
+| `version` | Mostra a versão |
+| `run-server` | Sobe o agente (é o que o serviço executa) |
+| `verificar-servico [--timeout N]` | `GET /health` na porta do `.env`; código 0 se `status=ok` |
+| `gerar-configuracao [--force]` | Cria o `.env` inicial (chaves novas); não sobrescreve sem `--force` |
+| `aplicar-sql` | Aplica `sql\001..003` no `DATABASE_URL` (o startup já tenta) |
+| `install-service`, `update-service`, `remove-service`, `start-service`, `stop-service`, `restart-service`, `debug-service` | Serviço `PHWhatsMeta` |
+
+**Gerar o exe.** `.\scripts\build_exe.ps1` (instala `requirements-dev.txt`, roda o PyInstaller e mostra versão e SHA1). Saída: `dist\whatsph.exe`.
+
+**Instalar ou atualizar (PowerShell como Administrador).**
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\preparar_ambiente_whatsph.ps1 -ExecutavelOrigem <pasta>\whatsph.exe -Diretorio C:\PHSFTW\SERVICOS\WHATSPH
+```
+
+Sem `-Diretorio`, o destino é `<PHSFTW da origem>\SERVICOS\WHATSPH`. O script (modelo `preparar_ambiente_huph.ps1`): para o serviço, copia o exe, cria o `.env` se faltar, registra (`install-service`) ou atualiza (`update-service`), inicia e espera `/health` com `role=agent` e a versão do exe. Sucesso: JSON `WHATSPH_AMBIENTE_PRONTO`; falha: `WHATSPH_PREPARACAO_FALHA` com a etapa.
+
+**Modo antigo (NSSM + Inno Setup) removido em 26/10/2026.** O usuário excluiu o serviço antigo (`sc delete`) e decidiu que ele não será usado em lugar nenhum. Saíram do repositório `installer\` (`WHATSPH.iss`, `install_service.bat`, `first_run.py`, `first_run.bat`, `apply_sql.bat`, `README_INSTALACAO.txt`) e `scripts\build_dist.ps1`; saíram também os builds locais `dist\installer\WHATSPH_Setup_0.2.4.exe` e `dist\whatsph\`. O `.env` inicial agora vem de `whatsph.exe gerar-configuracao` e o SQL de `whatsph.exe aplicar-sql` (o `scripts\apply_sql.py` de desenvolvimento continua). O `preparar_ambiente_whatsph.ps1` não migra mais NSSM: se o `PHWhatsMeta` estiver registrado com outro executável, recusa sem alterar nada. Ele mantém uma proteção: sem `.env` no destino, copia `<PHSFTW>\WHATSPH\.env` se existir, porque chaves novas quebrariam o GEPH (`PH_API_KEY`), a conta no banco (`INSTALLATION_ID`) e o token da Meta em `whatsapp_config` (`TOKEN_ENCRYPTION_KEY`). As pastas antigas `C:\PHSFTW\WHATSPH` e `D:\PHSFTW\WHATSPH` podem ser apagadas à mão depois do Rebuild do GEPH; **não** usar o `unins000.exe` delas (ele roda `nssm remove PHWhatsMeta` e removeria o serviço novo). A seção 13 cita arquivos do instalador que não existem mais: é histórico.
+
+**GEPH (PHVCL, CP1252 por script; ajustado de novo em 26/10/2026 a pedido do usuário).** `TWhatsMetaClient::LoadFromWhatsPhEnv()` não recebe mais parâmetro e lê **um** arquivo: `<PHSFTW>\SERVICOS\WHATSPH\.env`, onde `<PHSFTW>` é a pasta `PHSFTW` encontrada subindo a partir da pasta do executável (`ExtractFilePath(Application->ExeName)`, mesmo ponto de partida do `Whats.exe`/`AssinadorPDF.exe`). Ex.: `C:\PHSFTW\GEPH\SISTEMA\GEPH.EXE` → `C:\PHSFTW\SERVICOS\WHATSPH\.env`. Padrão `C:\PHSFTW\SERVICOS\WHATSPH\.env` quando o caminho do executável não tem pasta `PHSFTW` ou quando o `.env` montado não existe (ex.: build em `E:\PHSFTW\Geph\SISTEMA`). Função auxiliar pública `TWhatsMetaClient::DiretorioWhatsPh()` (estática). Saíram as buscas antigas (`PHSFTW\WHATSPH`, `D:\PHSFTW`, varredura a partir de `vg.DiretorioPrincipal`). As 4 chamadas (`Preview.cpp` envio em grupo, `SenWA.cpp` envio avulso e verificação da conta, `WhatsMetaUi.cpp` `loadCli`) viraram uma chamada só. As mensagens de erro passaram a mostrar o caminho do `.env` (não encontrado, incompleto sem `PH_API_KEY` ou erro de leitura). Porta padrão do construtor 8767. Validação: patch com contagem exata; bytes acentuados 9→13 no `.cpp` (3 mensagens novas), demais arquivos iguais; sem BOM, CRLF, sem `EF BF BD`; `Application` vem de `forms.hpp` pelo `vcl.h`; lógica do caminho simulada com as regras do Delphi 5 (`ExtractFilePath`/`ExtractFileName`/`ExcludeTrailingBackslash`) em 10 caminhos, inclusive UNC, sem laço infinito. **Não compilado aqui:** vale depois do Rebuild do `PH.bpl` e do GEPH. O agente só escuta `127.0.0.1`: o GEPH precisa rodar na mesma máquina do serviço. GEPH aberto de unidade de rede (`X:\PHSFTW\...`) lê o `.env` da rede e chama o `127.0.0.1` da própria estação. Até o Rebuild, o `GEPH.EXE` atual continua lendo `C:\PHSFTW\WHATSPH\.env` (mesmas chaves); depois do Rebuild essa pasta deixa de ser lida.
+
+**Testado em 26/10/2026 (sem tocar no serviço em uso).** Exe copiado para `%TEMP%\teste_whatsph\PHSFTW\SERVICOS\WHATSPH`: `version` 0.3.0; `gerar-configuracao` criou o `.env` com `PHSFTW_ROOT` da pasta PHSFTW de cima e, na 2ª vez, não sobrescreveu; `run-server` na porta 8799 respondeu `/health` (`role=agent`, 0.3.0); `/` serviu o painel React embutido e o `/assets/*.js` respondeu 200; `logs\whatsph.log` gravado. 
+**Instalado nesta máquina em 26/10/2026 (autorizado pelo usuário).** Antes de rodar o script, o serviço `PHWhatsMeta` (NSSM) já não existia: o log de Aplicativo mostra `nssm` recebendo STOP às 13:40:04 e a chave `HKLM\SYSTEM\CurrentControlSet\Services\PHWhatsMeta` tinha sumido. O usuário confirmou que excluiu o serviço antigo à mão (`sc delete`): o modo NSSM não será mais usado em lugar nenhum, só o `whatsph.exe`. Como sem serviço o script trataria como 1ª instalação (e geraria chaves novas), o `.env` de `D:\PHSFTW\WHATSPH` foi copiado antes (hash igual) para `C:\PHSFTW\SERVICOS\WHATSPH\.env`. Resultado do script: `WHATSPH_AMBIENTE_PRONTO`, 0.3.0, `db_ok=true`. Conferido: serviço Running, Automatic, LocalSystem, `PathName` `"C:\PHSFTW\SERVICOS\WHATSPH\whatsph.exe"`; `/health` `role=agent`, `schema_ok=true`; `/v1/whatsapp/status` `CONNECTED`. 2ª execução do script: `atualizado` (caminho `update-service`). Sem `-Diretorio` e com o exe fora de um PHSFTW, o script recusa (igual ao HUPH). As pastas antigas `D:\PHSFTW\WHATSPH` e `C:\PHSFTW\WHATSPH` ficaram como estavam (o GEPH sem Rebuild ainda lê o `.env` delas).
+
+**Ainda não feito.** Publicar `whatsph.exe` + `preparar_ambiente_whatsph.ps1` em `auxiliares` com `ListaHashs.txt` e atualização automática pelo BIPH (como o HUPH).
+
+**Revisão de 26/10/2026 (mesmo dia).**
+
+- Corrigido: tudo o que ia para `whatsph.log` era gravado também em `whatsph-service.log`, que não tem rotação. Agora o segundo fica parado (conferido: 2072 bytes antes e depois de 25 s de serviço).
+- Acrescentado: reinício automático do agente (acima). Teste: processo `run-server` morto à força; voltou a responder em 7 s, Aviso no log do Windows.
+- Corrigido no `preparar_ambiente_whatsph.ps1`: sem serviço registrado e sem `.env` no destino, o script gerava chaves novas mesmo com instalação antiga presente (foi o caso desta máquina). Agora procura antes o `.env` do `AppDirectory` do NSSM e depois `<PHSFTW do destino>\WHATSPH\.env`. Só gera um novo se nenhum existir. Se a instalação antiga estiver em outra unidade (ex.: `D:` com destino em `C:`), copiar o `.env` à mão antes.
+- Acrescentado: se o script falhar depois de parar o serviço, tenta religá-lo (`servico_religado` no JSON).
+- `verificar-servico`: `--timeout` inválido responde uso (código 2); a consulta ao `127.0.0.1` ignora proxy de ambiente.
+- Conferido: `run-server` filho reaproveita a pasta de extração `_MEI` do processo do serviço (3 processos `whatsph.exe` no total). Stop do serviço: 0 processos, porta 8767 livre, pasta `C:\Windows\Temp\_MEI*` apagada. Start: volta a responder.
+- Conferido: `C:\PHSFTW\WHATSPH\.env` (lido primeiro pelo GEPH sem Rebuild), `D:\PHSFTW\WHATSPH\.env` (serviço antigo) e `C:\PHSFTW\SERVICOS\WHATSPH\.env` têm os mesmos valores de `PH_API_KEY`, `INSTALLATION_ID`, `TOKEN_ENCRYPTION_KEY`, `PORT`, `DATABASE_URL`, `PHSFTW_ROOT`, `HUB_PULL_SECRET` e `PANEL_TICKET_SECRET` (comparados por hash, sem exibir).
+- Teste funcional sem envio: `GET /v1/whatsapp/templates` pelo serviço novo (decifra o token e chama a Graph por HTTPS de dentro do exe). Resposta: `ph_boleto_pdf` e `ph_relatorio_pdf` **APPROVED** (pt_BR). As seções 3, 8 e 9 ainda dizem "pendente": os dois modelos estão aprovados.
+- `Lib\phvcl_nova\WhatsMetaClient.cpp` (ramo `ramos/phvclnova`, r2258, versão antiga e diferente) **não** foi alterado: o GEPH compila com `Lib\phvcl` (`GEPH.bpr`). Continua com porta padrão 8765 e sem `SERVICOS\WHATSPH`.
+- O `.env` desta máquina tem `APP_ENV=development` (veio do antigo): o `/docs` do FastAPI fica aberto no `127.0.0.1`. Não alterado.

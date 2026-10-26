@@ -1,5 +1,7 @@
 # Roteiro — Próximos Passos WHATSPH
 
+> **Substituído em 26/10/2026.** O instalador Inno Setup + NSSM descrito aqui foi removido do repositório (`installer\`, `scripts\build_dist.ps1`). O agente agora é o `whatsph.exe` em `PHSFTW\SERVICOS\WHATSPH`, que registra o próprio serviço `PHWhatsMeta`: ver `documentacao.md` seção 14. Este roteiro fica só como histórico.
+
 **Data revisão:** 22/09/2026 17:57 (UTC-3)  
 **Projeto:** `C:\projetos\python\whatsmeta`  
 **GitHub:** https://github.com/danrleinascimento/whatsapp-meta-ph (`main`, commit `ed859f2`, app **v0.2.3**)  

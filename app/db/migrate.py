@@ -9,11 +9,12 @@ from typing import Any
 
 import psycopg2
 
+from app.caminhos import resource_dir
 from app.config import get_settings
 
 logger = logging.getLogger("whatsmeta.migrate")
 
-_SQL_DIR = Path(__file__).resolve().parents[2] / "sql"
+_SQL_DIR = resource_dir() / "sql"
 
 # Hub precisa destas; agente local usa 001+003 (+002 opcional)
 HUB_SQL_FILES = (

@@ -67,14 +67,13 @@ if settings.app_role == "hub":
     app.include_router(webhook_router)
     app.include_router(hub_router)
 else:
-    from pathlib import Path
-
     from fastapi.staticfiles import StaticFiles
 
     from app.agent.routes import router as agent_router
+    from app.caminhos import resource_dir
 
     app.include_router(agent_router)
-    _dist_assets = Path(__file__).resolve().parents[1] / "web" / "dist" / "assets"
+    _dist_assets = resource_dir() / "web" / "dist" / "assets"
     if _dist_assets.is_dir():
         app.mount("/assets", StaticFiles(directory=str(_dist_assets)), name="panel_assets")
 
