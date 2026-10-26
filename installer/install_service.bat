@@ -15,7 +15,7 @@ if not exist "%APPDIR%.venv\Scripts\python.exe" (
 )
 "%NSSM%" stop PHWhatsMeta >nul 2>&1
 "%NSSM%" remove PHWhatsMeta confirm >nul 2>&1
-"%NSSM%" install PHWhatsMeta "%APPDIR%.venv\Scripts\python.exe" "-m" "uvicorn" "app.main:app" "--host" "127.0.0.1" "--port" "8765"
+"%NSSM%" install PHWhatsMeta "%APPDIR%.venv\Scripts\python.exe" "-m" "uvicorn" "app.main:app" "--host" "127.0.0.1" "--port" "8767"
 "%NSSM%" set PHWhatsMeta AppDirectory "%APPDIR%"
 "%NSSM%" set PHWhatsMeta AppEnvironmentExtra APP_ROLE=agent
 "%NSSM%" set PHWhatsMeta AppStdout "%LOGDIR%\service_stdout.log"

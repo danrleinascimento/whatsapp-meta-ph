@@ -32,7 +32,7 @@ Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortugue
 Source: "..\dist\whatsph\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\WHATSPH Health"; Filename: "{cmd}"; Parameters: "/C start http://127.0.0.1:8765/health"; WorkingDir: "{app}"
+Name: "{group}\WHATSPH Health"; Filename: "{cmd}"; Parameters: "/C start http://127.0.0.1:8767/health"; WorkingDir: "{app}"
 ; Nao criar atalho do painel sem ticket (403).
 
 [Run]

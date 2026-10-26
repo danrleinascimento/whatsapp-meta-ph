@@ -2,7 +2,7 @@
 
 Documento para o próximo programador ou IA. Descreve o que o código faz, o que já está pronto, o que ainda falta e como ele se liga aos outros sistemas da PH Softwares.
 
-Data desta descrição: **25/09/2026**.  
+Data desta descrição: **25/09/2026**. Atualização em **19/10/2026**: porta do agente 8765 → 8767 (seção 13).  
 Código: `C:\projetos\python\whatsmeta`  
 Repositório: https://github.com/danrleinascimento/whatsapp-meta-ph  
 Hub em produção: https://whatsapp-meta-ph-wzewk.ondigitalocean.app  
@@ -21,11 +21,13 @@ Um único programa Python (FastAPI) com dois papéis, escolhidos pela variável 
 | Papel | Onde roda | Para que serve |
 |-------|-----------|----------------|
 | `hub` | DigitalOcean (URL acima) | Receber o webhook da Meta, guardar eventos e entregar esses eventos ao escritório. Também tem a página de cadastro embutido (Embedded Signup), ainda sem `config_id`. |
-| `agent` | PC do escritório, só em `127.0.0.1:8765` | Enviar PDF e texto pela Graph API, gravar o envio no Postgres local, puxar os eventos do hub e servir o painel “Acompanhar envios”. |
+| `agent` | PC do escritório, só em `127.0.0.1:8767` | Enviar PDF e texto pela Graph API, gravar o envio no Postgres local, puxar os eventos do hub e servir o painel “Acompanhar envios”. |
 
 O GEPH (C++ Builder 5) **não** fala com a Meta. Ele fala só com o agente local. O agente fala com a Graph API e com o hub. A Meta fala só com o hub (URL pública).
 
-Nome interno do agente no escritório: **WHATSPH**. Serviço Windows previsto: `PHWhatsMeta` (NSSM). Nesta sessão o serviço estava **parado**. Quem atendia a porta 8765 era o uvicorn do venv deste repositório.
+Nome interno do agente no escritório: **WHATSPH**. Serviço Windows: `PHWhatsMeta` (NSSM). Em 25/09/2026 o serviço estava **parado** e quem atendia a porta (então 8765) era o uvicorn do venv deste repositório.
+
+**Porta do agente: 8767 desde 19/10/2026** (antes 8765). A 8765 passou a ser do serviço HUPH (`C:\PHSFTW\SERVICOS\HUPH\huph.exe`, `127.0.0.1:8765`), usado pela Central RTPH. Detalhes na seção 13.
 
 ---
 
@@ -80,7 +82,7 @@ Meta Cloud API  (app PH_Softwares)
 Hub DigitalOcean  APP_ROLE=hub
     |  GET /v1/hub/events  (header X-PH-Hub-Secret, a cada 10 s)
     v
-Agente local  127.0.0.1:8765  APP_ROLE=agent
+Agente local  127.0.0.1:8767  APP_ROLE=agent
     |  Postgres local  whatsapp_ph
     |  painel React  /?ticket=
     ^
@@ -248,7 +250,7 @@ Não clicar em “Verificar e salvar” de novo: a URL e o campo `messages` já 
 | Domínio `phsoftwares.com.br` | só se a verificação da empresa pedir | Sozinho não publica o app |
 | Usuário Postgres do hub com `CREATE` em `public` | DigitalOcean / dono do banco | Eventos somem no reinício do hub; o poller não vê histórico |
 | `META_EMBEDDED_SIGNUP_CONFIG_ID` | painel do app Meta | “Conectar” no GEPH continua bloqueado. O seed atual não depende disso |
-| Copiar este código para a pasta do serviço e só então subir `PHWhatsMeta` | deploy | O serviço parado aponta para código velho em `D:\`. Subir os dois ao mesmo tempo briga pela porta 8765 |
+| Copiar este código para a pasta do serviço e só então subir `PHWhatsMeta` | deploy | O serviço parado aponta para código velho em `D:\`. Subir os dois ao mesmo tempo briga pela porta 8767 |
 | Commit/push do que mudou depois de `82218a6` | só se o usuário pedir | O GitHub não tem o `envio_tipo`, o rank de status nem os patches |
 
 ---
@@ -257,7 +259,7 @@ Não clicar em “Verificar e salvar” de novo: a URL e o campo `messages` já 
 
 ```powershell
 cd C:\projetos\python\whatsmeta
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8765
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8767
 ```
 
 O `python.exe` que aparece na linha de comando pode ser `C:\PHSFTW\PYTHON\python.exe`: é o interpretador base do venv (`pyvenv.cfg`), não uma cópia antiga do projeto. O que importa é o diretório de trabalho `C:\projetos\python\whatsmeta`.
@@ -265,12 +267,12 @@ O `python.exe` que aparece na linha de comando pode ser `C:\PHSFTW\PYTHON\python
 Conferir:
 
 ```powershell
-curl http://127.0.0.1:8765/health
+curl http://127.0.0.1:8767/health
 ```
 
 Esperado: `"role":"agent"`, `"db_ok":true`, `"schema_ok":true`.
 
-Não iniciar o serviço `PHWhatsMeta` enquanto esse processo estiver na 8765.
+Não iniciar o serviço `PHWhatsMeta` enquanto esse processo estiver na 8767. Desde 19/10/2026 o serviço está rodando na 8767: para subir o venv deste repositório ao mesmo tempo, parar o serviço antes ou usar outra porta livre (a 8765 é do HUPH).
 
 Variáveis que o `.env` do agente precisa ter (valores só no arquivo): `APP_ROLE=agent`, `DATABASE_URL`, `PH_API_KEY`, `TOKEN_ENCRYPTION_KEY`, `PANEL_TICKET_SECRET`, `HUB_BASE_URL`, `HUB_PULL_SECRET`, e as quatro chaves de modelo (`WHATSAPP_BOLETO_TEMPLATE_NAME=ph_boleto_pdf`, `WHATSAPP_BOLETO_TEMPLATE_LANG=pt_BR`, `WHATSAPP_RELATORIO_TEMPLATE_NAME=ph_relatorio_pdf`, `WHATSAPP_RELATORIO_TEMPLATE_LANG=pt_BR`). O token da conta em uso no dia a dia está cifrado em `whatsapp_config`, gravado pelo seed.
 
@@ -302,3 +304,20 @@ Ordem prática quando o usuário voltar:
 2. Olhar a tela Teste do app. Se `business_management` estiver Concluída, tentar Publicar.
 3. Enviar um PDF **novo** (não reusar o das 17:48) e ver se o painel sai de Aceito pela Meta.
 4. Se o webhook chegar e o hub reiniciar antes do poller, o evento se perde até existir tabela. Aí o passo é um usuário de banco com permissão de `CREATE` e `POST /v1/hub/migrate`.
+
+---
+
+## 13. Porta do agente: 8765 → 8767 (19/10/2026)
+
+**Por quê.** O serviço HUPH (`C:\PHSFTW\SERVICOS\HUPH\huph.exe`) escuta em `127.0.0.1:8765` e passou a ser usado pela Central RTPH (eventos RTC no `ph_erp`). O usuário decidiu mudar a porta do WhatsApp, não a do HUPH, e escolheu 8767.
+
+**O que mudou nesta máquina:**
+
+- Serviço `PHWhatsMeta` (NSSM, início automático): `Application` `D:\PHSFTW\WHATSPH\.venv\Scripts\python.exe`, `AppDirectory` `D:\PHSFTW\WHATSPH`, `AppParameters` `-m uvicorn app.main:app --host 127.0.0.1 --port 8767`. Conferido em 19/10: Running, `GET /health` com `role=agent`, versão 0.2.4, `db_ok=true`, `schema_ok=true`.
+- `PORT=8767` em `C:\PHSFTW\WHATSPH\.env` e `D:\PHSFTW\WHATSPH\.env`.
+- Instalador, gravado em bytes (sem regravar o arquivo inteiro com editor UTF-8): `installer\install_service.bat`, `installer\first_run.py`, `installer\README_INSTALACAO.txt` (2 ocorrências), `installer\WHATSPH.iss` e `.env.example` deste repositório; as cópias `install_service.bat`, `first_run.py` e `README_INSTALACAO.txt` em `D:\PHSFTW\WHATSPH\`. Sem commit.
+- Esta documentação, o `README.md`, `docs\INTEGRACAO_PHVCL_WHATSMETA.md` e os roteiros passaram a citar 8767.
+
+**Cliente C++ (`Lib\phvcl\WhatsMetaClient.cpp` e `Lib\phvcl_nova\WhatsMetaClient.cpp`).** O construtor começa com `BaseUrl = "http://127.0.0.1:8765"`. `LoadFromWhatsPhEnv` troca a porta pela chave `PORT` do primeiro `.env` encontrado (`{PHSFTW}\WHATSPH\.env`, pastas acima, `C:\PHSFTW\WHATSPH\.env`, `D:\PHSFTW\WHATSPH\.env`). Por isso o GEPH não precisou ser recompilado: basta o `.env` ter `PORT=8767`. **Atenção:** se o `.env` não tiver `PORT`, o cliente fica no padrão 8765 e chama o HUPH, não o agente. Trocar esse padrão exige editar o `.cpp` (CP1252) e recompilar, o que não foi feito.
+
+**Ainda com 8765 (não alterados):** `web\vite.config.ts` (proxy do `npm run dev`), `scripts\smoke_test.py` (URL padrão), scripts antigos `scripts\patch_*.py`, `scripts\reapply_geph_meta_warning.py`, `scripts\verify_final_review.py`, `scripts\write_whatsmeta_ui_cp1252.py`, o log `logs_agent_stderr.txt` e a pasta de build `dist\whatsph`. Para subir o agente em desenvolvimento ao lado do serviço, usar outra porta livre; 8765 é do HUPH e 8767 é do serviço.

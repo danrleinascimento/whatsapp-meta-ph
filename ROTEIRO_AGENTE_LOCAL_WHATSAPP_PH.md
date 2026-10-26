@@ -22,7 +22,7 @@
 | **3. Painel web WHATSPH** | Consultar envios, PDFs, status, usuário GEPH, máquina, data | Browser local (`127.0.0.1`) aberto pelo menu do GEPH |
 
 O GEPH **não** precisa reimplementar a UI de histórico: só abre o navegador em  
-`http://127.0.0.1:8765/` (ou porta fixa do painel) e chama a API de envio em background.
+`http://127.0.0.1:8767/` (ou porta fixa do painel) e chama a API de envio em background.
 
 ---
 
@@ -132,7 +132,7 @@ Nome da pasta: **`WHATSPH`** (você escreveu WHATSPH; confirme se prefere outro 
 ### 5.2 Enviar relatório / boleto
 
 1. Preview PHVCL / boletos → texto + PDF + lista  
-2. GEPH POST `127.0.0.1:8765/v1/whatsapp/send-batch` com `usuario_geph`, paths, destinatários  
+2. GEPH POST `127.0.0.1:8767/v1/whatsapp/send-batch` com `usuario_geph`, paths, destinatários  
 3. Agente valida path sob `PHSFTW` / diretórios PH  
 4. Fora da janela 24h → **template** utility (regra Meta)  
 5. Grava linhas em `whatsapp_message`  
@@ -141,7 +141,7 @@ Nome da pasta: **`WHATSPH`** (você escreveu WHATSPH; confirme se prefere outro 
 ### 5.3 Consultar histórico
 
 1. Menu GEPH → “WhatsApp / Painel”  
-2. Abre `http://127.0.0.1:8765/` (React)  
+2. Abre `http://127.0.0.1:8767/` (React)  
 3. Lista / filtros / detalhe  
 
 ---
@@ -150,7 +150,7 @@ Nome da pasta: **`WHATSPH`** (você escreveu WHATSPH; confirme se prefere outro 
 
 | ID | Decisão |
 |----|---------|
-| L1 | Porta API/painel base **8765** |
+| L1 | Porta API/painel base **8767** (era 8765 até 19/10/2026; a 8765 passou a ser do HUPH) |
 | L2 | Envio **e** retorno (sync via hub poll) |
 | L3 | PDF via upload `media_id` |
 | L8 | Graph **`v25.0`** (evitar v20 — fim 24/09/2026) |
@@ -194,7 +194,7 @@ Nome da pasta: **`WHATSPH`** (você escreveu WHATSPH; confirme se prefere outro 
    - **(U)** login com o **mesmo usuário do GEPH** (GEPH passa token/sessão ao abrir), ou  
    - **(S)** senha própria do WHATSPH?  
 4. Vários usuários GEPH no **mesmo** servidor: histórico **compartilhado do escritório** ou cada um só vê o que **ele** enviou (com filtro admin)?  
-5. Confirma porta única **8765** para API **e** painel (React no mesmo host)?  
+5. Confirma porta única **8767** para API **e** painel (React no mesmo host)?  
 6. Boletos em massa: aceita **template aprovado** fora da janela 24h (obrigação Meta)?  
 7. Ainda pendente: `DATABASE_URL` neste PC — consegue conectar no `whatsapp_ph` com o user `postgres` do `biph`? (sim/não, sem colar senha)
 

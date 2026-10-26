@@ -49,7 +49,7 @@ A PH fornece: App Meta, hub nuvem, agente local, painel, instalador, integraçã
 ```text
 ┌──────────────────────────── ESCRITÓRIO (PHSFTW) ────────────────────────────┐
 │  GEPH / EFPH / …  →  PH.bpl (Preview, boletos, menu WhatsApp)                 │
-│         │ HTTP 127.0.0.1:8765 + X-PH-Api-Key                                  │
+│         │ HTTP 127.0.0.1:8767 + X-PH-Api-Key                                  │
 │         │ abre browser → painel / Embedded Signup                             │
 │         ▼                                                                     │
 │  {PHSFTW}\WHATSPH\   Windows Service (FastAPI + React build)                  │
@@ -86,7 +86,7 @@ A PH fornece: App Meta, hub nuvem, agente local, painel, instalador, integraçã
 | Onboarding cliente | Embedded Signup (browser) no hub PH |
 | Painel | `{PHSFTW}\WHATSPH\` — FastAPI + React (Vite) |
 | Serviço Windows | Um service (NSSM/WinSW) |
-| Porta | `8765` em `127.0.0.1` |
+| Porta | `8767` em `127.0.0.1` (era `8765` até 19/10/2026; a 8765 passou a ser do HUPH) |
 | PDF | Upload `media` → `document.id` |
 | Graph API | **`v25.0`** (não usar v20 após 24/09/2026) |
 | Postgres cliente | Cluster PHSFTW, DB `whatsapp_ph`, PG **9.5** neste ambiente de dev |
@@ -115,7 +115,7 @@ Cadastro de usuários PH **não** está no Postgres `biph`. Evidência em `DMUsu
 
 | Fluxo | Como fazer (seguro) |
 |-------|---------------------|
-| **A — GEPH já logado** (preferido) | GEPH gera **ticket de uso único** (HMAC, TTL curto: usuário, código, expira) e abre `http://127.0.0.1:8765/?ticket=...`. WHATSPH valida o ticket com chave local compartilhada no `.env`. **Não** manda senha na URL. |
+| **A — GEPH já logado** (preferido) | GEPH gera **ticket de uso único** (HMAC, TTL curto: usuário, código, expira) e abre `http://127.0.0.1:8767/?ticket=...`. WHATSPH valida o ticket com chave local compartilhada no `.env`. **Não** manda senha na URL. |
 | **B — Abertura manual do painel** | Tela pede usuário/senha PH. Validação: **(B1)** endpoint local no agente que o GEPH/serviço PH já autenticou, ou **(B2)** rotina acordada de leitura de `SENUSU.PD` **somente após** documentar estrutura `SENUSU` / hash da senha no código PHVCL (fase de análise dedicada). |
 
 **Proibido:** enviar senha do GEPH em query string em claro.
@@ -205,7 +205,7 @@ Cadastro de usuários PH **não** está no Postgres `biph`. Evidência em `DMUsu
 | 1.1 | Congelar Q-DB (conexão `.env`) |
 | 1.2 | `sql/001_whatsapp_ph.sql` (PG 9.5: SERIAL/BIGSERIAL) |
 | 1.3 | Tabelas: `whatsapp_local_auth`, `whatsapp_config`, `whatsapp_message`, `whatsapp_webhook_event` (local mirror) |
-| 1.4 | `APP_ROLE=agent` · bind `127.0.0.1:8765` |
+| 1.4 | `APP_ROLE=agent` · bind `127.0.0.1:8767` |
 | 1.5 | `GET /health` com `db_ok` |
 | 1.6 | Auth `X-PH-Api-Key` |
 | 1.7 | Seed config PH Softwares (IDs já conhecidos) + System User token **só neste PC de dev** |
@@ -254,7 +254,7 @@ Cadastro de usuários PH **não** está no Postgres `biph`. Evidência em `DMUsu
 | 4.2 | Build → FastAPI serve `web/dist` em `/` |
 | 4.3 | Telas: lista envios, filtros (data, usuário, status, destino), detalhe |
 | 4.4 | Exibir: usuário GEPH, hostname, PDF, erros Meta |
-| 4.5 | Menu GEPH: abrir `http://127.0.0.1:8765/` |
+| 4.5 | Menu GEPH: abrir `http://127.0.0.1:8767/` |
 
 **Aceite:** histórico legível sem SQL.
 
@@ -291,7 +291,7 @@ Conforme doc Meta ([Embedded Signup](https://developers.facebook.com/docs/whatsa
 | 6.3 | Criar DB `whatsapp_ph` + aplicar SQL (mesmo cluster Postgres PH) |
 | 6.4 | Gerar `installation_id`, `PH_API_KEY`, `.env` |
 | 6.5 | NSSM/WinSW: serviço `PHWhatsMeta` · start automático · logs |
-| 6.6 | Atalho “Painel WhatsApp PH” → `http://127.0.0.1:8765/` |
+| 6.6 | Atalho “Painel WhatsApp PH” → `http://127.0.0.1:8767/` |
 | 6.7 | Teste em Windows 10/11 e Windows Server |
 
 **Aceite:** técnico não-Python sobe o serviço; `/health` ok.
@@ -302,7 +302,7 @@ Conforme doc Meta ([Embedded Signup](https://developers.facebook.com/docs/whatsa
 
 | # | Tarefa |
 |---|--------|
-| 7.1 | `WhatsMetaClient` (Indy) → `127.0.0.1:8765` |
+| 7.1 | `WhatsMetaClient` (Indy) → `127.0.0.1:8767` |
 | 7.2 | Form Conectar / Status / Abrir painel |
 | 7.3 | Preview `SpeedButton6Click`: se CONECTADO → Meta; senão Whats.exe |
 | 7.4 | Boletos: lote + template + PDF; passar `usuario_geph`, diretórios, telefones |

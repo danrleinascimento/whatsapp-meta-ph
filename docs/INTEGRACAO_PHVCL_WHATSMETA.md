@@ -25,4 +25,4 @@ CP1252 + CRLF. Usar scripts `scripts/write_whatsmeta_ui_cp1252.py` / patches se 
 4. Testar: Preview → Meta / Painel / Whats (SenWA)
 
 ## Runtime
-`{PHSFTW}\WHATSPH\.env` com `PH_API_KEY`; servico na :8765
+`{PHSFTW}\WHATSPH\.env` com `PH_API_KEY`; servico na :8767

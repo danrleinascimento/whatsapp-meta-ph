@@ -9,7 +9,7 @@ Um unico codigo; o papel e escolhido por `APP_ROLE`:
 | APP_ROLE | Onde | Funcao |
 |----------|------|--------|
 | `hub` | DigitalOcean | Webhook Meta, persistencia, pull de eventos, Embedded Signup |
-| `agent` | PC do escritorio `127.0.0.1:8765` | Envio Graph, painel ticket, poller de status |
+| `agent` | PC do escritorio `127.0.0.1:8767` | Envio Graph, painel ticket, poller de status |
 
 Roteiro mestre: `ROTEIRO_COMPLETO_DESENVOLVIMENTO_WHATSAPP_META_PH.md`
 
@@ -56,7 +56,7 @@ pip install -r requirements.txt
 # No .env: META_ACCESS_TOKEN, META_PHONE_NUMBER_ID, META_WABA_ID
 python scripts\seed_dev_config.py
 
-uvicorn app.main:app --host 127.0.0.1 --port 8765
+uvicorn app.main:app --host 127.0.0.1 --port 8767
 ```
 
 ## Painel React (WHATSPH)
@@ -76,7 +76,7 @@ Abra a URL com `?ticket=`. UI moderna (Vite + Tailwind); sem ticket = tela bloqu
 ### 1) Health + DB
 
 ```powershell
-curl http://127.0.0.1:8765/health
+curl http://127.0.0.1:8767/health
 ```
 
 Esperado: `"status":"ok"`, `"role":"agent"`, `"db_ok":true`.
@@ -84,7 +84,7 @@ Esperado: `"status":"ok"`, `"role":"agent"`, `"db_ok":true`.
 ### 2) Status (sem vazar token)
 
 ```powershell
-curl -H "X-PH-Api-Key: SUA_PH_API_KEY" http://127.0.0.1:8765/v1/whatsapp/status
+curl -H "X-PH-Api-Key: SUA_PH_API_KEY" http://127.0.0.1:8767/v1/whatsapp/status
 ```
 
 Esperado apos seed: `"connected":true`, `phone_number_id` preenchido, **sem** access_token.
@@ -92,7 +92,7 @@ Esperado apos seed: `"connected":true`, `phone_number_id` preenchido, **sem** ac
 ### 3) Path guard (PDF fora do PHSFTW)
 
 ```powershell
-curl -X POST http://127.0.0.1:8765/v1/whatsapp/send-document `
+curl -X POST http://127.0.0.1:8767/v1/whatsapp/send-document `
   -H "X-PH-Api-Key: SUA_PH_API_KEY" -H "Content-Type: application/json" `
   -d "{\"to\":\"554984110604\",\"file_path\":\"C:\\\\Windows\\\\notepad.exe\"}"
 ```
@@ -105,7 +105,7 @@ Liste os nomes **exatos** aprovados na WABA (nao confie so no curl do painel Met
 
 ```powershell
 python scripts\list_templates.py
-# ou: GET http://127.0.0.1:8765/v1/whatsapp/templates
+# ou: GET http://127.0.0.1:8767/v1/whatsapp/templates
 ```
 
 Envio (o agente resolve alias `lp_`→`3p_` e valida idioma APPROVED):
@@ -127,7 +127,7 @@ python scripts\gen_panel_ticket.py ADMIN
 # Abra a URL impressa no browser
 ```
 
-Abrir `http://127.0.0.1:8765/` **sem** ticket deve retornar 403.
+Abrir `http://127.0.0.1:8767/` **sem** ticket deve retornar 403.
 
 ### 6) Hub (DigitalOcean)
 

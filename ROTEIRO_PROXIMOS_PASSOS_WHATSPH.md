@@ -27,7 +27,7 @@ PHVCL: `docs/INTEGRACAO_PHVCL_WHATSMETA.md`.
 | `HUB_PULL_SECRET` DO | **OK** | alinhado ao `.env` local — events autenticados |
 | `META_APP_SECRET` / verify token DO | **OK** | Encrypted |
 | `META_APP_ID` | **Confirmado** | `2053406131958490` (Meta Basic) — conferir se já está no env DO |
-| Agente local `:8765` | **OK** | `role=agent` `db_ok=true` `schema_ok=true` |
+| Agente local `:8765` (porta da época; 8767 desde 19/10/2026) | **OK** | `role=agent` `db_ok=true` `schema_ok=true` |
 | Poller → hub | **OK** | `GET /v1/hub/events` → `HTTP/1.1 200 OK` |
 | Seed / CONECTADO | **OK** | WABA `2147274472541752` telefone `+554984110604` |
 | Template smoke 17:54 | **OK envio** | `ACCEPTED` `3p_direct_integration_test_template` → `5549998185612` |
@@ -49,7 +49,7 @@ PHVCL: `docs/INTEGRACAO_PHVCL_WHATSMETA.md`.
 |------|----------|
 | Painel | **FastAPI + React Vite + Tailwind** (`web/`) — Django descartado |
 | Hub | DigitalOcean App Platform `APP_ROLE=hub` |
-| Agente | Windows loopback `127.0.0.1:8765` `APP_ROLE=agent` |
+| Agente | Windows loopback `127.0.0.1:8767` `APP_ROLE=agent` |
 | Eventos hub sem CREATE | Fallback **memória** até Neon/doadmin |
 | C++ | Indy → agente; **sem** App Secret no BPL |
 
@@ -124,7 +124,7 @@ Pendente inteiro. Bloqueia piloto multi-escritório.
 
 ## N5 — Instalador Windows (produção WHATSPH) — PASSO A PASSO
 
-**Objetivo:** técnico instala em `{PHSFTW}\WHATSPH\` sem Python “na mão”; serviço `PHWhatsMeta` sobe `:8765`.
+**Objetivo:** técnico instala em `{PHSFTW}\WHATSPH\` sem Python “na mão”; serviço `PHWhatsMeta` sobe `:8767`.
 
 ### N5.A — Pré-requisitos (dev PH)
 
@@ -146,7 +146,7 @@ mkdir dist\whatsph -Force
    - `#define MyAppVersion "0.2.3"`
    - `Source` apontando para `dist\whatsph\*`
 5. Completar `installer/install_service.bat` (NSSM):
-   - `nssm install PHWhatsMeta ...\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8765`
+   - `nssm install PHWhatsMeta ...\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8767`
    - AppDirectory = `{PHSFTW}\WHATSPH`
    - logs → `WHATSPH\logs\`
 6. `apply_sql.bat`: `python scripts\apply_sql.py` com `DATABASE_URL` do cliente (DB `whatsapp_ph` local).
@@ -157,7 +157,7 @@ mkdir dist\whatsph -Force
 APP_ROLE=agent
 APP_ENV=production
 BIND_HOST=127.0.0.1
-PORT=8765
+PORT=8767
 INSTALLATION_ID=<uuid>
 DATABASE_URL=postgresql://.../whatsapp_ph
 PH_API_KEY=<gerado>
@@ -177,7 +177,7 @@ PHSFTW_ROOT=C:\PHSFTW
 2. Instalar em VM Win10/11 limpa (ou pasta teste)
 3. Aceite:
    - [ ] Serviço `PHWhatsMeta` Running
-   - [ ] `http://127.0.0.1:8765/health` → `role=agent` `db_ok=true`
+   - [ ] `http://127.0.0.1:8767/health` → `role=agent` `db_ok=true`
    - [ ] Abrir `/?` sem ticket → 403 / tela bloqueada
    - [ ] Ticket via API → painel React
 

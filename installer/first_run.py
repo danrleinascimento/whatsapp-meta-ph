@@ -34,7 +34,7 @@ def main() -> int:
         "APP_ROLE=agent",
         "APP_ENV=production",
         "LOG_LEVEL=INFO",
-        "PORT=8765",
+        "PORT=8767",
         "BIND_HOST=127.0.0.1",
         f"INSTALLATION_ID={uuid.uuid4()}",
         f"PHSFTW_ROOT={phsftw}",

@@ -43,7 +43,7 @@
 | 1 | Só API oficial Meta Cloud API / Graph. |
 | 2 | `META_APP_SECRET` **somente** no hub DigitalOcean. Nunca no instalador, `.env` do agente de cliente, C++, ou Git. |
 | 3 | Fontes `.cpp` / `.h` / `.dfm` = **CP1252 + CRLF** (`REGRA_CODIFICACAO.md` no GEPH). Não salvar UTF-8. |
-| 4 | Agente escuta só **loopback** `127.0.0.1:8765`. |
+| 4 | Agente escuta só **loopback** `127.0.0.1:8767`. |
 | 5 | Painel web: **somente** com ticket HMAC gerado pelo GEPH/API (`POST /v1/panel/ticket`). URL sem ticket = bloqueio. |
 | 6 | Se agente offline ou WhatsApp não `CONNECTED` → manter fluxo legado **Whats.exe** (SenWA já faz fallback). |
 | 7 | Telefone Meta no SenWA: **11 dígitos** (DDD+número); envio Graph usa `55` + esses dígitos. |
@@ -62,7 +62,7 @@
 | PHVCL fontes | Client + Ui + SenWA + Preview + PH.cpp/bpk — **CP1252 OK** |
 | `WhatsMetaClient.obj` | Existe |
 | `WhatsMetaUi.obj` | **NÃO existe** → Rebuild PH.bpl **obrigatório** |
-| Agente `:8765` agora | **Offline** (subir quando for testar) |
+| Agente `:8765` agora (porta da época; 8767 desde 19/10/2026) | **Offline** (subir quando for testar) |
 | Painel React / smoke Meta | Já comprovados em 22/09 |
 | Embedded Signup `config_id` | Ainda não criado |
 
@@ -88,7 +88,7 @@
     |  Indy HTTP + header X-PH-Api-Key
     v
 [Serviço Windows PHWhatsMeta]  ← instalador
-    127.0.0.1:8765  APP_ROLE=agent
+    127.0.0.1:8767  APP_ROLE=agent
     Postgres local whatsapp_ph
     Painel React em web/dist (ticket)
     |  poll HUB_PULL_SECRET
@@ -398,7 +398,7 @@ dist\whatsph\
 
 **Recomendação v1:** D4a ou D4b. O `install_service.bat` atual assume:
 
-`{app}\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8765`
+`{app}\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8767`
 
 ### D.5 Scripts a criar (ainda não existem todos)
 
@@ -422,7 +422,7 @@ Gerar e gravar em `{app}\.env`:
 | `APP_ROLE` | `agent` |
 | `APP_ENV` | `production` |
 | `BIND_HOST` | `127.0.0.1` |
-| `PORT` | `8765` |
+| `PORT` | `8767` |
 | `INSTALLATION_ID` | UUID novo |
 | `PH_API_KEY` | `secrets.token_urlsafe(32)` |
 | `TOKEN_ENCRYPTION_KEY` | key urlsafe |
@@ -459,13 +459,13 @@ Gerar e gravar em `{app}\.env`:
    1. `first_run.bat` (gera `.env` se não existir)  
    2. `apply_sql.bat`  
    3. `install_service.bat`  
-5. Não criar atalho que abra `http://127.0.0.1:8765/` sem ticket.  
+5. Não criar atalho que abra `http://127.0.0.1:8767/` sem ticket.  
 
 ### E.3 NSSM (`install_service.bat`)
 
 Já faz:
 
-- `nssm install PHWhatsMeta ... python -m uvicorn app.main:app --host 127.0.0.1 --port 8765`  
+- `nssm install PHWhatsMeta ... python -m uvicorn app.main:app --host 127.0.0.1 --port 8767`  
 - `AppDirectory` = pasta WHATSPH  
 - `AppEnvironmentExtra APP_ROLE=agent`  
 - `SERVICE_AUTO_START`  
@@ -494,15 +494,15 @@ Completar na implementação:
 
 - Windows 10/11 limpo (ou Server)  
 - Postgres acessível (instalar ou usar o do PH)  
-- Porta 8765 livre  
+- Porta 8767 livre  
 
 ### F.2 Roteiro de teste
 
 1. Instalar `WHATSPH_Setup_0.2.3.exe`  
 2. Verificar pasta `{PHSFTW}\WHATSPH\.env` (sem secrets Meta de envio embutidos de lab)  
 3. `services.msc` → `PHWhatsMeta` Running  
-4. Browser: `http://127.0.0.1:8765/health` → `role=agent` `db_ok=true`  
-5. `http://127.0.0.1:8765/` sem ticket → bloqueado  
+4. Browser: `http://127.0.0.1:8767/health` → `role=agent` `db_ok=true`  
+5. `http://127.0.0.1:8767/` sem ticket → bloqueado  
 6. Com `PH_API_KEY` do `.env`:  
    `POST /v1/panel/ticket` → abrir `panel_url` → React ok  
 7. Seed/pairing CONECTADO → smoke template  

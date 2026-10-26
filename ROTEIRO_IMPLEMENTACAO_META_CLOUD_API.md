@@ -457,7 +457,7 @@ Não reproduzir telas Meta (mudam). Descrever passos oficiais e linkar Help Cent
 | **D2** | Status DELIVERED/READ na UI do PH na v1? (A) só ack envio (B) sync webhook hub DO→local | Escopo Python/hub |
 | **D3** | Criar `whatsapp_ph` **agora** neste PC? | Fase 1 |
 | **D4** | Embedded Signup no **próprio app DO** (recomendado agora) ou em outro domínio PH? Stack web disponível? | Fase 3 — **phnet não é mais premissa** |
-| **D5** | Porta local do agente (ex. `8765`) e forma de instalação (serviço Windows vs iniciar com o GEPH)? | Deploy |
+| **D5** | Porta local do agente (ex. `8765`) e forma de instalação (serviço Windows vs iniciar com o GEPH)? Em 19/10/2026: porta **8767** (a 8765 passou a ser do HUPH), serviço Windows `PHWhatsMeta` (NSSM). Ver `documentacao.md` seção 13. | Deploy |
 | **D6** | “Cadastro único” = **1 WABA por instalação/escritório** (confirmado). Precisa campo `empresa_id` GEPH nos logs mesmo assim (multi-empresa no mesmo EXE)? | Modelo de dados |
 | **D7** | PDF no Meta: enviar **arquivo binário** na Cloud API (recomendado) ou continuar só **link** `ph.srv.br` como no Whats.exe? | UX + mídia |
 
