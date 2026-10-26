@@ -8,9 +8,12 @@ from pathlib import Path
 from typing import Any
 
 import psycopg2
+from psycopg2 import sql
+from psycopg2.extensions import parse_dsn
 
 from app.caminhos import resource_dir
 from app.config import get_settings
+from app.db.connection import abrir_conexao
 
 logger = logging.getLogger("whatsmeta.migrate")
 
@@ -34,7 +37,7 @@ def schema_ok() -> bool:
     if not url:
         return False
     try:
-        conn = psycopg2.connect(url)
+        conn = abrir_conexao()
         try:
             with conn.cursor() as cur:
                 cur.execute(
@@ -51,6 +54,45 @@ def schema_ok() -> bool:
         return False
 
 
+# Chave do pg_advisory_lock: duas preparacoes ao mesmo tempo nao criam o banco duas vezes.
+_LOCK_CRIAR_BANCO = 72840131
+
+
+def garantir_banco() -> bool:
+    """Cria o banco do DATABASE_URL (UTF8) se ainda nao existir. True se criou agora."""
+    url = get_settings().database_url
+    if not url:
+        raise RuntimeError("DATABASE_URL ausente no .env")
+    nome = parse_dsn(url).get("dbname")
+    if not nome:
+        raise RuntimeError("DATABASE_URL sem o nome do banco")
+    conn = None
+    for base in ("postgres", "template1"):
+        try:
+            conn = abrir_conexao(dbname=base, connect_timeout=5)
+            break
+        except psycopg2.OperationalError:
+            if base == "template1":
+                raise
+    try:
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            cur.execute("SELECT pg_advisory_lock(%s)", (_LOCK_CRIAR_BANCO,))
+            try:
+                cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (nome,))
+                if cur.fetchone() is not None:
+                    return False
+                cur.execute(
+                    sql.SQL("CREATE DATABASE {} ENCODING 'UTF8' TEMPLATE template0").format(sql.Identifier(nome))
+                )
+                logger.info("Banco %s criado", nome)
+                return True
+            finally:
+                cur.execute("SELECT pg_advisory_unlock(%s)", (_LOCK_CRIAR_BANCO,))
+    finally:
+        conn.close()
+
+
 def apply_sql_files(file_names: tuple[str, ...] | list[str]) -> dict[str, Any]:
     """
     Aplica arquivos SQL. Retorna dict com ok, applied, errors.
@@ -62,7 +104,7 @@ def apply_sql_files(file_names: tuple[str, ...] | list[str]) -> dict[str, Any]:
 
     applied: list[str] = []
     errors: list[str] = []
-    conn = psycopg2.connect(settings.database_url)
+    conn = abrir_conexao()
     try:
         conn.autocommit = True
         with conn.cursor() as cur:

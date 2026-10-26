@@ -38,3 +38,6 @@ web/dist-ssr/
 # whatsph.exe e arquivos de build do PyInstaller (scripts/build_exe.ps1)
 /dist/
 /build/
+
+# instalarWHATSPH.exe (scripts/build_instalador.ps1)
+/instalador/saida/

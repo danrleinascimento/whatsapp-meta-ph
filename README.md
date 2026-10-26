@@ -150,7 +150,7 @@ Apos deploy com `APP_ROLE=hub`, `DATABASE_URL` do DO, `HUB_PULL_SECRET`, `META_A
 |------|---------------|-------------------|
 | 0–4 | Implementado neste repo | Token seed no `.env`; deploy hub com pull secret |
 | 5 Embedded Signup | Scaffold hub + claim | App Review / config_id Meta |
-| 6 Instalador | `whatsph.exe` + `scripts\preparar_ambiente_whatsph.ps1` | Ver `documentacao.md` seção 14 |
+| 6 Instalador | `instalador\saida\instalarWHATSPH.exe` (`scripts\build_instalador.ps1`; instala e atualiza) | Ver `documentacao.md` seção 14 |
 | 7 PHVCL/GEPH | — | Cliente HTTP + ticket |
 | 8 Templates piloto | `ph_boleto_pdf`, `ph_relatorio_pdf` | APPROVED (conferido 26/10/2026) |
 

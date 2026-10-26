@@ -6,9 +6,24 @@ from contextlib import contextmanager
 from typing import Any, Iterator, Optional
 
 import psycopg2
+import psycopg2.extensions
 import psycopg2.extras
 
 from app.config import get_settings
+
+
+def abrir_conexao(dbname: Optional[str] = None, **opcoes: Any) -> Any:
+    """psycopg2.connect no DATABASE_URL. Agente com URL sem senha: usa a senha padrao PH (como o HUPH)."""
+    settings = get_settings()
+    if not settings.database_url:
+        raise RuntimeError("DATABASE_URL nao configurado")
+    if settings.app_role == "agent" and "password" not in psycopg2.extensions.parse_dsn(settings.database_url):
+        from app.credenciais import obter_senha_banco
+
+        opcoes["password"] = obter_senha_banco()
+    if dbname:
+        opcoes["dbname"] = dbname
+    return psycopg2.connect(settings.database_url, **opcoes)
 
 
 def db_ok() -> bool:
@@ -27,10 +42,7 @@ def db_ok() -> bool:
 
 @contextmanager
 def connect() -> Iterator[Any]:
-    settings = get_settings()
-    if not settings.database_url:
-        raise RuntimeError("DATABASE_URL nao configurado")
-    conn = psycopg2.connect(settings.database_url)
+    conn = abrir_conexao()
     try:
         yield conn
         conn.commit()

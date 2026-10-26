@@ -2,7 +2,7 @@
 # Uso:
 #   cd C:\projetos\python\whatsmeta
 #   .\scripts\build_exe.ps1
-# Publicar: dist\whatsph.exe + scripts\preparar_ambiente_whatsph.ps1
+# Depois: .\scripts\build_instalador.ps1 gera instalador\saida\instalarWHATSPH.exe (instala e atualiza no cliente).
 
 # pip e PyInstaller escrevem progresso no stderr: falha e decidida pelo $LASTEXITCODE.
 $ErrorActionPreference = "Continue"

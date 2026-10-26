@@ -224,13 +224,11 @@ def send_document(
         nparams = _template_body_param_count(tpl)
         if nparams >= 1:
             if tipo == "relatorio":
-                texts = [_template_text_param(body_name or "relatorio")]
+                texts = [_template_text_param(_sem_pontuacao_final(body_name or "") or "relatorio")]
             else:
-                texts = [_template_text_param(body_name or "")]
+                texts = [_template_text_param(_sem_pontuacao_final(body_name or "") or "cliente")]
                 if nparams >= 2:
-                    texts.append(
-                        _template_text_param(body_detail or _caption_as_body_detail(caption))
-                    )
+                    texts.append(_template_text_param(_detalhe_boleto(body_detail, caption)))
             while len(texts) < nparams:
                 texts.append("-")
             components.append(
@@ -312,19 +310,51 @@ def _resolve_envio_tipo(envio_tipo: str) -> tuple[str, str, str]:
 
 
 def _template_text_param(raw: str) -> str:
-    """Parametros de body do template nao podem ser vazios (Meta)."""
-    s = (raw or "").replace("\r", " ").replace("\n", " ").strip()
+    """Parametro de body do template: nunca vazio e sem quebra de linha, tab ou mais de 4 espacos seguidos (Meta)."""
+    s = " ".join((raw or "").split())
     if not s:
         return "-"
     return s[:1024]
 
 
-def _caption_as_body_detail(caption: Optional[str]) -> str:
-    if not caption:
-        return "-"
-    # Compacta caption multilinha do GEPH em um detalhe curto
-    line = " ".join(part.strip() for part in caption.replace("\r\n", "\n").split("\n") if part.strip())
-    return line[:1024] if line else "-"
+def _sem_pontuacao_final(texto: str) -> str:
+    """Os modelos ja poem pontuacao logo depois da variavel ({{1}}! / {{1}}. / {{2}}.)."""
+    return " ".join((texto or "").split()).rstrip(" .,;:!?")
+
+
+# Linhas fixas da legenda do GEPH (Preview.cpp montarCaptionWhatsBoletoMeta) que o texto do ph_boleto_pdf ja diz.
+_LINHAS_REPETIDAS_BOLETO = ("boleto", "segue pdf do boleto em anexo")
+_INICIO_DADOS_BOLETO = ("competencia:", "compet\u00eancia:", "vencimento:", "segue sua nfs-e:")
+
+
+def _detalhe_boleto(body_detail: Optional[str], caption: Optional[str]) -> str:
+    """{{2}} de 'Segue o PDF do seu boleto{{2}}. Qualquer duvida...': comeca com pontuacao e nao termina com ponto.
+
+    Legenda do GEPH -> ', Competencia: 09/2026, Vencimento: 15/10/2026. Mensagem opcional'.
+    """
+    if body_detail and body_detail.strip():
+        texto = _sem_pontuacao_final(body_detail)
+        if texto and texto[0] not in ",.;:":
+            texto = ", " + texto
+        return (texto or ", em anexo")[:900]
+    dados: list[str] = []
+    mensagem: list[str] = []
+    for linha in (caption or "").replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        limpa = _sem_pontuacao_final(linha)
+        if not limpa or limpa.lower() in _LINHAS_REPETIDAS_BOLETO:
+            continue
+        if limpa.lower().startswith(_INICIO_DADOS_BOLETO):
+            if limpa.lower().startswith("segue sua nfs-e:"):
+                limpa = "NFS-e:" + limpa[len("segue sua nfs-e:"):]
+            dados.append(limpa)
+        else:
+            # Mensagem opcional digitada no GEPH (pode ter varias linhas): mantem a pontuacao do usuario.
+            mensagem.append(" ".join(linha.split()))
+    texto = ", " + ", ".join(dados) if dados else ", em anexo"
+    opcional = _sem_pontuacao_final(" ".join(mensagem))
+    if opcional:
+        texto += ". " + opcional
+    return texto[:900]
 
 
 def _template_body_param_count(tpl: dict[str, Any]) -> int:

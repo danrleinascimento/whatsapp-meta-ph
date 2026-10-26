@@ -2,7 +2,8 @@
 param(
     [Parameter(Mandatory = $true)][string]$ExecutavelOrigem,
     [string]$Diretorio = "",
-    [int]$TempoEspera = 60
+    [int]$TempoEspera = 60,
+    [string]$ArquivoResultado = ""
 )
 
 # Instala ou atualiza o servico Windows PHWhatsMeta a partir do whatsph.exe
@@ -10,6 +11,8 @@ param(
 # Sem .env no destino, copia <PHSFTW>\WHATSPH\.env (pasta da instalacao antiga) se existir:
 # PH_API_KEY, INSTALLATION_ID e TOKEN_ENCRYPTION_KEY precisam continuar os mesmos.
 # PHWhatsMeta registrado com outro executavel: o script recusa sem alterar nada.
+# Banco: 'whatsph.exe preparar-banco' cria o banco do DATABASE_URL se faltar e cria/atualiza as tabelas.
+# ArquivoResultado: grava tambem o JSON final nesse arquivo (usado pelo instalarWHATSPH.exe).
 
 $ErrorActionPreference = "Stop"
 $NomeServico = "PHWhatsMeta"
@@ -24,6 +27,14 @@ function executarWhatsph([string[]]$Argumentos) {
         throw "Comando whatsph falhou: $($Argumentos[0]) - $($saida -join ' ')"
     }
     return ($saida -join "`n")
+}
+
+function emitirResultado([hashtable]$Dados) {
+    $json = $Dados | ConvertTo-Json -Depth 5 -Compress
+    if (-not [string]::IsNullOrWhiteSpace($ArquivoResultado)) {
+        try { [IO.File]::WriteAllText($ArquivoResultado, $json, [Text.Encoding]::Default) } catch { }
+    }
+    return $json
 }
 
 function copiarExecutavel([string]$origem, [string]$destino, [int]$tempo_espera) {
@@ -140,6 +151,17 @@ try {
         }
     }
 
+    $etapa = "banco"
+    $saida_banco = & $destino 'preparar-banco' 2>&1
+    $codigo_banco = $LASTEXITCODE
+    $banco = $null
+    try { $banco = ($saida_banco -join "`n") | ConvertFrom-Json } catch { $banco = $null }
+    if ($codigo_banco -ne 0 -or $null -eq $banco -or $banco.status -ne 'SUCESSO') {
+        $motivo_banco = $saida_banco -join ' '
+        if ($null -ne $banco -and $banco.mensagem) { $motivo_banco = $banco.mensagem }
+        throw "Banco nao preparado (DATABASE_URL de $arquivo_env): $motivo_banco"
+    }
+
     $etapa = "registro_servico"
     if ($null -ne $servico) {
         executarWhatsph -Argumentos @('update-service') | Out-Null
@@ -173,12 +195,12 @@ try {
 
     $acao = 'atualizado'
     if ($primeira_instalacao) { $acao = 'instalado' }
-    @{
+    emitirResultado -Dados @{
         codigo = 'WHATSPH_AMBIENTE_PRONTO'; status = 'SUCESSO'; versao = $versao
         mensagem = "WHATSPH $versao $acao em $pasta. Servico em execucao e respondendo."
         diretorio = $pasta; primeira_instalacao = $primeira_instalacao
-        configuracao = $configuracao; db_ok = $saude.db_ok
-    } | ConvertTo-Json -Depth 5 -Compress
+        configuracao = $configuracao; db_ok = $saude.db_ok; banco_criado = [bool]$banco.banco_criado
+    }
     exit 0
 } catch {
     $mensagem_erro = $_.Exception.Message
@@ -195,10 +217,10 @@ try {
             $servico_religado = $false
         }
     }
-    @{
+    emitirResultado -Dados @{
         codigo = 'WHATSPH_PREPARACAO_FALHA'; status = 'ERRO'; etapa = $etapa
         mensagem = "Falha na etapa '$etapa': $mensagem_erro"; servico_religado = $servico_religado
-    } | ConvertTo-Json -Depth 5 -Compress
+    }
     exit 1
 } finally {
     if ($local_alterado) { Pop-Location }

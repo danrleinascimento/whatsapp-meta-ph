@@ -117,11 +117,38 @@ def generate_config(args: list[str]) -> int:
 
 def apply_sql(_: list[str]) -> int:
     os.environ.setdefault("APP_ROLE", "agent")
+    setup_logging()
     from app.db.migrate import AGENT_SQL_FILES, apply_sql_files
 
     result = apply_sql_files(AGENT_SQL_FILES)
     print_json(result)
     return 0 if result.get("ok") else 1
+
+
+def prepare_database(_: list[str]) -> int:
+    """Cria o banco do DATABASE_URL se faltar e aplica sql\001..003 (todos com IF NOT EXISTS)."""
+    os.environ.setdefault("APP_ROLE", "agent")
+    # Log so no arquivo: aviso no stderr derrubaria o preparar_ambiente_whatsph.ps1 (2>&1 com Stop).
+    setup_logging()
+    from app.db.migrate import AGENT_SQL_FILES, apply_sql_files, garantir_banco
+
+    try:
+        criado = garantir_banco()
+        result = apply_sql_files(AGENT_SQL_FILES)
+    except Exception as exc:
+        print_json({"codigo": "WHATSPH_BANCO_FALHA", "status": "ERRO", "mensagem": " ".join(str(exc).split())})
+        return 1
+    if not result.get("ok") or result.get("errors"):
+        print_json({
+            "codigo": "WHATSPH_BANCO_FALHA", "status": "ERRO", "banco_criado": criado,
+            "mensagem": "Tabelas nao aplicadas: " + "; ".join(result.get("errors") or ["schema incompleto"]),
+        })
+        return 1
+    print_json({
+        "codigo": "WHATSPH_BANCO_PRONTO", "status": "SUCESSO", "banco_criado": criado,
+        "sql_aplicados": result.get("applied", []),
+    })
+    return 0
 
 
 def show_version(_: list[str]) -> int:
@@ -134,6 +161,7 @@ COMMANDS = {
     "verificar-servico": check_service,
     "gerar-configuracao": generate_config,
     "aplicar-sql": apply_sql,
+    "preparar-banco": prepare_database,
     "version": show_version,
 }
 
