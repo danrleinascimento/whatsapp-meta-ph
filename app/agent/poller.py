@@ -154,11 +154,21 @@ def _loop() -> None:
     settings = get_settings()
     interval = max(5, int(settings.poll_interval_seconds or 10))
     logger.info("Poller iniciado (intervalo=%ss)", interval)
+    from app.agent import onboarding, template_setup
+
     while not _STATE["stop"]:
+        try:
+            onboarding.claim_pending_once()
+        except Exception:
+            logger.exception("Poller: erro no resgate do cadastro WhatsApp")
         try:
             poll_once()
         except Exception:
             logger.exception("Poller erro")
+        try:
+            template_setup.maybe_ensure()
+        except Exception:
+            logger.exception("Poller: erro ao verificar templates de documento")
         time.sleep(interval)
 
 

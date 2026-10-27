@@ -20,6 +20,8 @@ logging.basicConfig(
     level=getattr(logging, settings.log_level.upper(), logging.INFO),
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
 )
+# O httpx loga a URL completa em INFO; a troca do code e o debug_token levam o App Secret na query.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger("whatsmeta")
 
 

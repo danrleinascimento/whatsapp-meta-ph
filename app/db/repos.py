@@ -275,6 +275,13 @@ def pairing_store_db(
     graph_api_version: str,
     expires_at,
 ) -> None:
+    import datetime as _dt
+
+    # O mesmo pair_code volta se o escritorio refizer o cadastro antes do agente resgatar.
+    execute(
+        "DELETE FROM whatsapp_pairing_blob WHERE pair_code = %s OR expires_at < %s",
+        (pair_code, _dt.datetime.utcnow()),
+    )
     execute(
         """
         INSERT INTO whatsapp_pairing_blob (

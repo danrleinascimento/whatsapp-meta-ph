@@ -39,6 +39,54 @@ def _validar_assinatura(raw_body: bytes, signature_header: Optional[str], app_se
     return hmac.compare_digest(digest, expected)
 
 
+# Coexistencia: historico de conversas e contatos do app WhatsApp Business. Nenhuma parte
+# do sistema usa esse conteudo e o hub so repassa eventos (politica de privacidade).
+_CAMPOS_NAO_PERSISTIDOS = frozenset({"history", "smb_app_state_sync"})
+
+
+def _separar_campos_nao_persistidos(payload: Any) -> tuple[Any, list[tuple[Any, dict[str, Any]]]]:
+    """Retorna (payload sem esses campos ou None se nada sobrar, [(waba_id, change removido)])."""
+    if not isinstance(payload, dict) or not isinstance(payload.get("entry"), list):
+        return payload, []
+    removidos: list[tuple[Any, dict[str, Any]]] = []
+    entries: list[Any] = []
+    for entry in payload["entry"]:
+        changes = entry.get("changes") if isinstance(entry, dict) else None
+        if not isinstance(changes, list):
+            entries.append(entry)
+            continue
+        mantidos = []
+        for change in changes:
+            if isinstance(change, dict) and change.get("field") in _CAMPOS_NAO_PERSISTIDOS:
+                removidos.append((entry.get("id"), change))
+            else:
+                mantidos.append(change)
+        if mantidos:
+            entries.append({**entry, "changes": mantidos})
+    if not removidos:
+        return payload, []
+    return ({**payload, "entry": entries} if entries else None), removidos
+
+
+def _resumo_sync(change: dict[str, Any]) -> str:
+    """Progresso da sincronizacao (sem conteudo das conversas) para o log."""
+    value = change.get("value") if isinstance(change.get("value"), dict) else {}
+    if change.get("field") == "smb_app_state_sync":
+        itens = value.get("state_sync")
+        return f"contatos={len(itens) if isinstance(itens, list) else 0}"
+    partes = []
+    for item in value.get("history") or []:
+        if not isinstance(item, dict):
+            continue
+        for err in item.get("errors") or []:
+            if isinstance(err, dict):
+                partes.append(f"erro={err.get('code')}")
+        meta = item.get("metadata")
+        if isinstance(meta, dict):
+            partes.append(f"fase={meta.get('phase')} progresso={meta.get('progress')}")
+    return " ".join(partes) or "sem metadata"
+
+
 def _extract_waba_and_field(payload: Any) -> tuple[Optional[str], Optional[str]]:
     if not isinstance(payload, dict):
         return None, None
@@ -108,6 +156,17 @@ async def receber_evento_webhook(
     entries = payload.get("entry") if isinstance(payload, dict) else None
     n = len(entries) if isinstance(entries, list) else 0
     logger.info("Webhook recebido object=%s entries=%s bytes=%s", obj, n, len(raw))
+
+    payload, removidos = _separar_campos_nao_persistidos(payload)
+    for waba_removido, change in removidos:
+        logger.info(
+            "Webhook %s waba=%s nao persistido: %s",
+            change.get("field"),
+            waba_removido,
+            _resumo_sync(change),
+        )
+    if payload is None:
+        return {"status": "ok"}
 
     waba_id, field_name = _extract_waba_and_field(payload)
     try:

@@ -181,48 +181,36 @@ def api_create_ticket(
     }
 
 
+@router.post("/v1/whatsapp/onboarding/start")
+def api_onboarding_start(_: str = Depends(require_api_key)) -> dict[str, Any]:
+    """GEPH > Conectar conta WhatsApp: gera o codigo de vinculacao e devolve a URL do cadastro."""
+    from app.agent import onboarding
+
+    try:
+        return onboarding.start()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/v1/whatsapp/onboarding/status")
+def api_onboarding_status(_: str = Depends(require_api_key)) -> dict[str, Any]:
+    from app.agent import onboarding
+
+    return onboarding.status()
+
+
 @router.post("/v1/whatsapp/pairing/claim")
 def api_pairing_claim(
     pair_code: str = Query(...),
     _: str = Depends(require_api_key),
 ) -> dict[str, Any]:
-    """Agente baixa o blob de pairing do hub e grava token cifrado."""
-    import httpx
-    from app.crypto import encrypt_token
+    """Resgate manual do pair_code mostrado na pagina do hub (cadastro aberto sem o GEPH)."""
+    from app.agent import onboarding
 
-    settings = get_settings()
-    if not settings.hub_base_url or not settings.hub_pull_secret:
-        raise HTTPException(status_code=500, detail="HUB_BASE_URL/HUB_PULL_SECRET ausentes")
-    url = settings.hub_base_url.rstrip("/") + "/v1/hub/pairing/claim"
-    with httpx.Client(timeout=30.0) as client:
-        resp = client.post(
-            url,
-            params={"pair_code": pair_code, "installation_id": settings.installation_id},
-            headers={"X-PH-Hub-Secret": settings.hub_pull_secret},
-        )
-    if resp.status_code >= 400:
-        raise HTTPException(status_code=resp.status_code, detail=resp.text)
-    data = resp.json()
-    token = data.get("access_token")
-    if not token:
-        raise HTTPException(status_code=502, detail="Hub nao retornou access_token")
-    repos.upsert_config(
-        settings.installation_id,
-        status="CONNECTED",
-        waba_id=data.get("waba_id"),
-        phone_number_id=data.get("phone_number_id"),
-        display_phone=data.get("display_phone"),
-        graph_api_version=data.get("graph_api_version") or settings.graph_api_version,
-        access_token_enc=encrypt_token(token),
-        last_error=None,
-    )
-    return {
-        "ok": True,
-        "status": "CONNECTED",
-        "waba_id": data.get("waba_id"),
-        "phone_number_id": data.get("phone_number_id"),
-        "display_phone": data.get("display_phone"),
-    }
+    try:
+        return onboarding.claim(pair_code)
+    except onboarding.ClaimError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.get("/v1/panel/session")

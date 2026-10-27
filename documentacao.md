@@ -384,3 +384,100 @@ Sem `-Diretorio`, o destino é `<PHSFTW da origem>\SERVICOS\WHATSPH`. O script (
 - Teste funcional sem envio: `GET /v1/whatsapp/templates` pelo serviço novo (decifra o token e chama a Graph por HTTPS de dentro do exe). Resposta: `ph_boleto_pdf` e `ph_relatorio_pdf` **APPROVED** (pt_BR). As seções 3, 8 e 9 ainda dizem "pendente": os dois modelos estão aprovados.
 - `Lib\phvcl_nova\WhatsMetaClient.cpp` (ramo `ramos/phvclnova`, r2258, versão antiga e diferente) **não** foi alterado: o GEPH compila com `Lib\phvcl` (`GEPH.bpr`). Continua com porta padrão 8765 e sem `SERVICOS\WHATSPH`.
 - O `.env` desta máquina tem `APP_ENV=development` (veio do antigo): o `/docs` do FastAPI fica aberto no `127.0.0.1`. Não alterado.
+
+## 15. Conectar conta pelo GEPH com coexistência do WhatsApp Business (27/10/2026)
+
+**Decisão do usuário.** Os escritórios conectam o **mesmo número que já usam no app WhatsApp Business** (coexistência), com sincronização do histórico.
+
+**Fontes oficiais seguidas.**
+
+- Coexistência: `developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/onboarding-business-app-users`.
+  - O evento `FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING` traz **só o `waba_id`**, sem `phone_number_id`.
+  - Não se chama `/register`, porque o número já está registrado.
+  - `POST /{phone_id}/smb_app_data` com `smb_app_state_sync` (contatos) e depois `history`, em até 24 h e **uma vez cada**. Se o prazo passar, o escritório precisa sair e refazer o cadastro.
+- Tech Provider: `.../embedded-signup/onboarding-customers-as-a-tech-provider`.
+  - A troca do code é feita no servidor e o code vale 30 s.
+  - Depois vem `subscribed_apps`.
+  - O cliente cadastra a forma de pagamento no WhatsApp Manager.
+- WABA pelo token: `.../solution-providers/manage-accounts`, com `debug_token` e o primeiro `target_ids` de `whatsapp_business_management`.
+
+**Fluxo novo.**
+
+1. GEPH > Conectar conta WhatsApp:
+   - confere se o serviço está no ar;
+   - se a conta já estiver conectada, pergunta com o botão "Não" como padrão;
+   - chama `POST /v1/whatsapp/onboarding/start` no agente.
+2. O agente (`app\agent\onboarding.py`) gera o `pair_code` (`secrets.token_urlsafe(24)`, vale 1 h, fica só em memória) e devolve `{HUB}/onboarding?installation_id=...&pair_code=...`. O GEPH abre essa URL.
+3. A página do hub (`app\hub\routes.py`, `/onboarding`):
+   - valida `installation_id` (`[A-Za-z0-9][A-Za-z0-9._-]{0,63}`) e `pair_code` (`[A-Za-z0-9_-]{20,64}`);
+   - abre o `FB.login` com `featureType: whatsapp_business_app_onboarding` e `sessionInfoVersion: '3'`;
+   - guarda o `event`, o `waba_id` e o `phone_number_id` da mensagem `WA_EMBEDDED_SIGNUP` e mostra o motivo quando vem `CANCEL`;
+   - envia o code na hora.
+4. `POST /v1/hub/embedded-signup/exchange` (`app\hub\onboarding.py`), em ordem:
+   1. troca o code pelo token;
+   2. chama `debug_token`, que dá a WABA quando o evento não chegou e o `expires_at`;
+   3. chama `subscribed_apps`, com 1 nova tentativa;
+   4. lê o número em `GET /{waba}/phone_numbers`;
+   5. lê `is_on_biz_app` e `platform_type` do número.
+5. Decisão a partir desses campos:
+   - Com `is_on_biz_app=true`, é coexistência: sincroniza contatos e histórico.
+   - Com `false` e `CLOUD_API`, é um número que já está na API, como o da PH: segue sem sincronizar.
+   - Com `false` e outra plataforma, recusa e pede para escolher a conta existente do WhatsApp Business. Nada é guardado.
+   - Sem resposta da Meta, decide pelo evento da página.
+6. O token fica guardado no hub por 10 min com o `pair_code` do agente. Se o escritório refizer o cadastro, o vínculo anterior com o mesmo código é apagado (`repos.pairing_store_db`).
+7. O poller do agente tenta o resgate a cada 10 s (`claim_pending_once`):
+   - 404 ou 5xx: continua esperando;
+   - outro 4xx (403, 410, 401): encerra com erro;
+   - 200: grava `whatsapp_config` como `CONNECTED`.
+
+   Se a gravação local falhar, os dados ficam em memória e a gravação é repetida, porque o hub já apagou o vínculo.
+8. Depois de conectar, `app\agent\template_setup.py` cria na WABA do escritório os modelos que faltarem.
+   - Usa o mesmo texto e o rodapé dos modelos aprovados da PH: `ph_boleto_pdf` e `ph_relatorio_pdf`, `UTILITY`, `pt_BR`, header `DOCUMENT` com handle da Resumable Upload API.
+   - Precisa de `META_APP_ID` no `.env` do agente, que o `gerar-configuracao` já escreve.
+   - Confere a cada 6 h, ou em 30 min depois de uma falha. Modelo que já existe, em qualquer status, não é recriado.
+
+**Outras mudanças.**
+
+- **Hub:** o `httpx` foi silenciado (WARNING) em `app\main.py`. Antes, o log da DigitalOcean recebia a URL da troca do code com o `client_secret` (App Secret) na query.
+- **Webhook:** `history` e `smb_app_state_sync` não são gravados (`app\webhook.py`). O log fica só com o progresso, a fase e o erro 2593109 (histórico recusado). Motivos:
+  - nada no sistema usa esse conteúdo;
+  - a política de privacidade diz que o hub só repassa;
+  - o hub hoje guarda eventos em memória (`schema_ok=false`).
+
+  `smb_message_echoes` continua sendo gravado, como `messages`.
+- **Página do hub:** valores dentro do `<script>` com `<`, `>` e `&` escapados (`_js`). Antes, um `installation_id` com `</script>` quebrava a página.
+- **Agente:** `GET /v1/whatsapp/onboarding/status` (estado do último cadastro). `POST /v1/whatsapp/pairing/claim` (resgate manual, com o código mostrado quando a página é aberta sem o GEPH) usa o mesmo código.
+- **Versão:** 0.4.0.
+
+**GEPH (PHVCL, CP1252 por `scripts\patch_conectar_onboarding.py`).**
+
+- `TWhatsMetaClient::StartOnboarding(AnsiString &OutUrl)` em `WhatsMetaClient.h/.cpp`. Com agente antigo (HTTP 404), a mensagem pede para atualizar o WHATSPH.
+- `WhatsMetaAbrirConectar` reescrito em `WhatsMetaUi.cpp`. A URL não é mais montada no GEPH e saiu a frase falsa "o serviço usa esse código automaticamente".
+- Validação:
+  - bytes acima de 127: `.h` 0→0, `.cpp` 13→18, `WhatsMetaUi.cpp` 37→49 (á ã ç é í ó ú);
+  - sem BOM, CRLF, sem `EF BF BD`.
+- **Não compilado aqui.**
+
+**Testes (27/10/2026, Graph e hub simulados com `httpx.MockTransport`, nada real).**
+
+- coexistência com a sequência exata de chamadas e sem `/register`;
+- WABA pelo `debug_token`;
+- code recusado;
+- número fora do app;
+- número já na Cloud API;
+- resgate com `installation_id` errado (403), certo (200) e repetido (404);
+- validações da página;
+- filtro do webhook;
+- resgate automático no agente, nova gravação depois de falha e 410;
+- criação só do modelo que falta, com o payload conferido.
+
+A página foi aberta localmente no navegador: os textos e a mensagem de sucesso aparecem certos. Nesse teste visual apareceu e foi corrigido um erro: todo texto em JavaScript tem `.link`, e as linhas apareciam como "undefined".
+
+**Depende de.**
+
+- App Review aprovado e app publicado.
+- `META_EMBEDDED_SIGNUP_CONFIG_ID` na DigitalOcean.
+- Campos `history`, `smb_app_state_sync` e `smb_message_echoes` assinados no webhook do app.
+- Deploy do hub (push).
+- Instalador do WHATSPH 0.4.0 nos escritórios.
+- Rebuild do `PH.bpl` e do GEPH.
