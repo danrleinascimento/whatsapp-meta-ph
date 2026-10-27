@@ -407,7 +407,10 @@ Sem `-Diretorio`, o destino é `<PHSFTW da origem>\SERVICOS\WHATSPH`. O script (
    - confere se o serviço está no ar;
    - se a conta já estiver conectada, pergunta com o botão "Não" como padrão;
    - chama `POST /v1/whatsapp/onboarding/start` no agente.
-2. O agente (`app\agent\onboarding.py`) gera o `pair_code` (`secrets.token_urlsafe(24)`, vale 1 h, fica só em memória) e devolve `{HUB}/onboarding?installation_id=...&pair_code=...`. O GEPH abre essa URL.
+2. O agente (`app\agent\onboarding.py`) gera o `pair_code` (`secrets.token_urlsafe(24)`, vale 1 h) e devolve `{HUB}/onboarding?installation_id=...&pair_code=...`. O GEPH abre essa URL.
+   - Cada clique gera um código novo e os anteriores continuam valendo até expirar (no máximo 10). O escritório pode concluir em qualquer aba aberta.
+   - Os códigos pendentes ficam também em `onboarding_pendente.json`, na pasta do `whatsph.exe`, e são recuperados se o serviço reiniciar. Só código e validade vão para o arquivo; o token nunca.
+   - Motivo: na coexistência a sincronização só pode ser pedida uma vez. Um cadastro concluído não pode se perder.
 3. A página do hub (`app\hub\routes.py`, `/onboarding`):
    - valida `installation_id` (`[A-Za-z0-9][A-Za-z0-9._-]{0,63}`) e `pair_code` (`[A-Za-z0-9_-]{20,64}`);
    - abre o `FB.login` com `featureType: whatsapp_business_app_onboarding` e `sessionInfoVersion: '3'`;
@@ -420,7 +423,7 @@ Sem `-Diretorio`, o destino é `<PHSFTW da origem>\SERVICOS\WHATSPH`. O script (
    4. lê o número em `GET /{waba}/phone_numbers`;
    5. lê `is_on_biz_app` e `platform_type` do número.
 5. Decisão a partir desses campos:
-   - Com `is_on_biz_app=true`, é coexistência: sincroniza contatos e histórico.
+   - Com `is_on_biz_app=true`, é coexistência: sincroniza contatos e histórico. O pedido de sincronização só é repetido se não chegou a sair (falha de conexão) ou se a Meta respondeu 5xx. Sem resposta depois de enviado, não repete e avisa que o pedido pode ter sido aceito.
    - Com `false` e `CLOUD_API`, é um número que já está na API, como o da PH: segue sem sincronizar.
    - Com `false` e outra plataforma, recusa e pede para escolher a conta existente do WhatsApp Business. Nada é guardado.
    - Sem resposta da Meta, decide pelo evento da página.
@@ -447,7 +450,7 @@ Sem `-Diretorio`, o destino é `<PHSFTW da origem>\SERVICOS\WHATSPH`. O script (
   `smb_message_echoes` continua sendo gravado, como `messages`.
 - **Página do hub:** valores dentro do `<script>` com `<`, `>` e `&` escapados (`_js`). Antes, um `installation_id` com `</script>` quebrava a página.
 - **Agente:** `GET /v1/whatsapp/onboarding/status` (estado do último cadastro). `POST /v1/whatsapp/pairing/claim` (resgate manual, com o código mostrado quando a página é aberta sem o GEPH) usa o mesmo código.
-- **Versão:** 0.4.0.
+- **Versão:** 0.4.0; 0.4.1 depois da revisão do mesmo dia (vários códigos pendentes, arquivo de pendentes e sincronização sem repetição duvidosa).
 
 **GEPH (PHVCL, CP1252 por `scripts\patch_conectar_onboarding.py`).**
 

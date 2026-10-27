@@ -76,15 +76,27 @@ def _call(
     params: Optional[dict[str, Any]] = None,
     json_body: Optional[dict[str, Any]] = None,
     retry: bool = False,
+    once_only: bool = False,
 ) -> tuple[Optional[dict[str, Any]], Optional[str]]:
-    """Retorna (json, None) em 2xx ou (None, texto do erro). retry: repete 1x em rede/5xx."""
+    """Retorna (json, None) em 2xx ou (None, texto do erro). retry: repete 1x em rede/5xx.
+
+    once_only: pedido que a Meta aceita uma unica vez. So repete se o pedido nao chegou a sair
+    (falha de conexao) ou se a Meta respondeu 5xx; sem resposta depois de enviado, nao repete.
+    """
     headers = {"Authorization": f"Bearer {token}"} if token else None
     attempts = 2 if retry else 1
     error = "sem resposta"
     for _ in range(attempts):
         try:
             resp = client.request(method, _url(path), params=params, json=json_body, headers=headers)
+        except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+            error = f"falha de rede: {exc.__class__.__name__}"
+            continue
         except httpx.TransportError as exc:
+            if once_only:
+                return None, (
+                    f"sem resposta da Meta ({exc.__class__.__name__}); o pedido pode ter sido aceito"
+                )
             error = f"falha de rede: {exc.__class__.__name__}"
             continue
         if resp.status_code < 400:
@@ -281,6 +293,7 @@ def run_onboarding(
                     token=token,
                     json_body={"messaging_product": "whatsapp", "sync_type": sync_type},
                     retry=True,
+                    once_only=True,
                 )
                 if err:
                     logger.error("smb_app_data %s falhou phone=%s: %s", sync_type, phone_id, err)

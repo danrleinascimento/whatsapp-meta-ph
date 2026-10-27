@@ -3,21 +3,31 @@
 O agente gera o pair_code e o GEPH abre {HUB}/onboarding?installation_id=...&pair_code=...
 O hub guarda o token com esse codigo; o poller resgata com HUB_PULL_SECRET + installation_id.
 So este agente e o navegador do escritorio conhecem o codigo.
+
+Cada clique em Conectar gera um codigo novo e os anteriores continuam valendo ate expirar:
+o escritorio pode concluir o cadastro em qualquer aba aberta. Na coexistencia a sincronizacao
+do app WhatsApp Business so pode ser pedida uma vez, entao um cadastro concluido nao pode se
+perder. Por isso os codigos pendentes ficam tambem em arquivo (reinicio do servico). O token
+resgatado fica so em memoria ate ser gravado cifrado no banco.
 """
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import re
 import secrets
 import threading
 import time
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urlencode
 
 import httpx
 
+from app.caminhos import install_dir
 from app.config import get_settings
 from app.crypto import encrypt_token
 from app.db import repos
@@ -26,10 +36,15 @@ logger = logging.getLogger("whatsmeta.agent.onboarding")
 
 # Mesmo formato aceito pelo hub (app/hub/routes.py).
 INSTALLATION_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
+PAIR_CODE_RE = re.compile(r"[A-Za-z0-9_-]{20,64}")
 PENDING_TTL_SECONDS = 3600
+MAX_PENDING = 10
+PENDING_FILE_NAME = "onboarding_pendente.json"
 
 _LOCK = threading.Lock()
-_PENDING: dict[str, Any] = {}
+# pair_code -> {"expires": epoch, "data": blob resgatado do hub ainda nao gravado}
+_PENDING: dict[str, dict[str, Any]] = {}
+_LOADED = {"done": False}
 _LAST: dict[str, Any] = {"state": "IDLE", "message": None, "at": None}
 
 
@@ -44,8 +59,56 @@ def _set_last(state: str, message: Optional[str] = None) -> None:
     _LAST.update(state=state, message=message, at=datetime.now().isoformat(timespec="seconds"))
 
 
+def _pending_file() -> Path:
+    return install_dir() / PENDING_FILE_NAME
+
+
+def _persist_locked() -> None:
+    """Grava so codigo e validade (o token nunca vai para o arquivo)."""
+    path = _pending_file()
+    items = {code: int(item["expires"]) for code, item in _PENDING.items()}
+    try:
+        if not items:
+            if path.exists():
+                path.unlink()
+            return
+        tmp = path.with_name(path.name + ".tmp")
+        tmp.write_text(json.dumps(items), encoding="utf-8")
+        os.replace(tmp, path)
+    except OSError as exc:
+        logger.warning("Nao foi possivel gravar %s: %s", path, exc)
+
+
+def _load_locked() -> None:
+    if _LOADED["done"]:
+        return
+    _LOADED["done"] = True
+    path = _pending_file()
+    if not path.exists():
+        return
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        logger.warning("Arquivo %s ilegivel (%s): ignorado", path, exc)
+        return
+    now = time.time()
+    if isinstance(raw, dict):
+        for code, expires in raw.items():
+            if (
+                isinstance(code, str)
+                and PAIR_CODE_RE.fullmatch(code)
+                and isinstance(expires, (int, float))
+                and expires > now
+            ):
+                _PENDING[code] = {"expires": float(expires), "data": None}
+    if _PENDING:
+        _set_last("WAITING")
+        logger.info("Cadastro WhatsApp: %s codigo(s) pendente(s) recuperado(s)", len(_PENDING))
+    _persist_locked()
+
+
 def start() -> dict[str, Any]:
-    """Novo codigo de vinculacao (substitui o anterior) e URL da pagina de cadastro do hub."""
+    """Novo codigo de vinculacao e URL da pagina de cadastro do hub (anteriores continuam validos)."""
     settings = get_settings()
     if not settings.hub_base_url or not settings.hub_pull_secret:
         raise RuntimeError("HUB_BASE_URL/HUB_PULL_SECRET ausentes na configuracao do WHATSPH")
@@ -53,8 +116,21 @@ def start() -> dict[str, Any]:
         raise RuntimeError("INSTALLATION_ID invalido na configuracao do WHATSPH")
     code = secrets.token_urlsafe(24)
     with _LOCK:
-        _PENDING.clear()
-        _PENDING.update(code=code, expires=time.monotonic() + PENDING_TTL_SECONDS)
+        _load_locked()
+        now = time.time()
+        for old in [c for c, item in _PENDING.items() if item["expires"] <= now and item["data"] is None]:
+            del _PENDING[old]
+        while len(_PENDING) >= MAX_PENDING:
+            oldest = min(
+                (c for c, item in _PENDING.items() if item["data"] is None),
+                key=lambda c: _PENDING[c]["expires"],
+                default=None,
+            )
+            if oldest is None:
+                break
+            del _PENDING[oldest]
+        _PENDING[code] = {"expires": now + PENDING_TTL_SECONDS, "data": None}
+        _persist_locked()
         _set_last("WAITING")
     query = urlencode({"installation_id": settings.installation_id, "pair_code": code})
     logger.info("Cadastro WhatsApp iniciado (aguardando resgate no hub)")
@@ -66,7 +142,8 @@ def start() -> dict[str, Any]:
 
 def status() -> dict[str, Any]:
     with _LOCK:
-        return dict(_LAST)
+        _load_locked()
+        return {**_LAST, "pending": len(_PENDING)}
 
 
 def _fetch_blob(pair_code: str) -> dict[str, Any]:
@@ -120,26 +197,22 @@ def _save(data: dict[str, Any]) -> dict[str, Any]:
 
 def claim(pair_code: str) -> dict[str, Any]:
     """Resgate manual (pair_code mostrado na pagina). ClaimError com o status HTTP do hub."""
-    return _save(_fetch_blob(pair_code))
+    result = _save(_fetch_blob(pair_code))
+    _drop_pending(pair_code, "CONNECTED")
+    return result
 
 
 def _drop_pending(code: str, state: str, message: Optional[str] = None) -> None:
     with _LOCK:
-        if _PENDING.get("code") == code:
-            _PENDING.clear()
+        if _PENDING.pop(code, None) is not None:
+            _persist_locked()
+        if state == "CONNECTED" or not _PENDING:
             _set_last(state, message)
 
 
-def claim_pending_once() -> bool:
-    """Chamado pelo poller. True quando conectou nesta chamada."""
-    with _LOCK:
-        code = _PENDING.get("code")
-        expires = float(_PENDING.get("expires") or 0)
-        data = _PENDING.get("data")
-    if not code:
-        return False
+def _claim_one(code: str, expires: float, data: Optional[dict[str, Any]]) -> bool:
     if data is None:
-        if time.monotonic() > expires:
+        if time.time() > expires:
             _drop_pending(code, "EXPIRED", "Cadastro nao concluido em 1 hora. Abra Conectar conta WhatsApp de novo.")
             return False
         try:
@@ -154,8 +227,8 @@ def claim_pending_once() -> bool:
             logger.warning("Resgate do cadastro: hub inacessivel (%s)", exc.__class__.__name__)
             return False
         with _LOCK:
-            if _PENDING.get("code") == code:
-                _PENDING["data"] = data
+            if code in _PENDING:
+                _PENDING[code]["data"] = data
     try:
         _save(data)
     except Exception:
@@ -164,3 +237,18 @@ def claim_pending_once() -> bool:
         return False
     _drop_pending(code, "CONNECTED")
     return True
+
+
+def claim_pending_once() -> bool:
+    """Chamado pelo poller. True quando conectou nesta chamada."""
+    with _LOCK:
+        _load_locked()
+        items = sorted(
+            ((code, item["expires"], item["data"]) for code, item in _PENDING.items()),
+            key=lambda x: x[1],
+        )
+    connected = False
+    for code, expires, data in items:
+        if _claim_one(code, expires, data):
+            connected = True
+    return connected

@@ -29,6 +29,8 @@ Desktop.ini
 secrets/
 local_data/
 logs_agent_*.txt
+# codigos de cadastro pendentes do agente (app/agent/onboarding.py)
+onboarding_pendente.json
 
 # Frontend
 web/node_modules/
