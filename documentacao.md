@@ -2,11 +2,11 @@
 
 Documento para o próximo programador ou IA. Descreve o que o código faz, o que já está pronto, o que ainda falta e como ele se liga aos outros sistemas da PH Softwares.
 
-Data desta descrição: **25/09/2026**. Atualização em **19/10/2026**: porta do agente 8765 → 8767 (seção 13). Atualização em **26/10/2026**: `whatsph.exe` e serviço em `PHSFTW\SERVICOS\WHATSPH` (seção 14).  
+Data desta descrição: **25/09/2026**. Atualização em **19/10/2026**: porta do agente 8765 → 8767 (seção 13). Atualização em **26/10/2026**: `whatsph.exe` e serviço em `PHSFTW\SERVICOS\WHATSPH` (seção 14). Atualização em **27/10/2026**: "Conectar conta WhatsApp" com coexistência, 0.4.0/0.4.1 (seção 15), e estado atual com o App Review (seção 16). **Para retomar, comece pela seção 16 e pelo `ROTEIRO_APROVACAO_META.md`.**  
 Código: `C:\projetos\python\whatsmeta`  
 Repositório: https://github.com/danrleinascimento/whatsapp-meta-ph  
 Hub em produção: https://whatsapp-meta-ph-wzewk.ondigitalocean.app  
-Versão do processo local conferida nesta sessão: **0.2.4** (`GET /health`).
+Versão do processo local conferida nesta sessão: **0.2.4** (`GET /health`). Em 27/10/2026: hub **0.4.1**; serviço desta máquina **0.3.2** (instalador 0.4.1 gerado, ainda não instalado).
 
 O `README.md` desta pasta é um resumo de endpoints e de como subir o agente. A tabela “Fases ainda humanas” do README está **atrasada**: o cliente C++ e os modelos de PDF já existem (ver seções 7 e 11). Este arquivo é a descrição completa.
 
@@ -296,6 +296,8 @@ Editar `.env` em UTF-8. Não usar `Add-Content` do PowerShell (já corrompeu o a
 
 ## 12. Onde continuar
 
+**Desde 27/10/2026, a retomada é pela seção 16 e pelo `ROTEIRO_APROVACAO_META.md`.** O que segue é a ordem de 25/09, mantida como histórico.
+
 Histórico da sessão no GEPH, com arquivos, bugs e validações: `C:\CBuilder5\Projects\GEPH\ajustesrealizados.md` seção 21.
 
 Ordem prática quando o usuário voltar:
@@ -484,3 +486,67 @@ A página foi aberta localmente no navegador: os textos e a mensagem de sucesso 
 - Deploy do hub (push).
 - Instalador do WHATSPH 0.4.0 nos escritórios.
 - Rebuild do `PH.bpl` e do GEPH.
+
+---
+
+## 16. Estado em 27/10/2026 e o resto da sessão de 26–27/10/2026
+
+Esta seção junta o que aconteceu em 26–27/10/2026 fora das seções 14 e 15. Ela vale mais que as seções 3, 8, 9 e 12, que ficaram como histórico de 25/09.
+
+**Linha do tempo.**
+
+| Data | O que | Onde |
+|------|-------|------|
+| 26/10 | `whatsph.exe`, serviço `PHWhatsMeta` sem NSSM, instalador `instalarWHATSPH.exe` com etapa de banco (0.3.0 → 0.3.1) | Seção 14 |
+| 26/10 | GEPH lê o `.env` de `<PHSFTW>\SERVICOS\WHATSPH` (PHVCL r2307) | Seção 14; GEPH `ajustesrealizados.md` §28 |
+| 26/10 | 0.3.2: legenda do modelo `ph_boleto_pdf` virou frase correta (`app\agent\send_service.py`) | Seção 6 |
+| 26/10 | Política de privacidade `docs\site\privacidade.html`, publicada em `https://phsoftwares.com.br/privacidade.php` | Commit `77d4179` |
+| 26–27/10 | Meta: configurações básicas do app, Provedor de Tecnologia, vídeos e envio do App Review (27/10, 08:58) | `ROTEIRO_APROVACAO_META.md` |
+| 27/10 | 0.4.0: "Conectar conta WhatsApp" com coexistência (hub + agente + PHVCL r2308) | Seção 15; commit `9435428` |
+| 27/10 | 0.4.1: revisão (vários códigos pendentes em arquivo; sincronização sem repetição duvidosa) | Seção 15; commit `540648c` |
+| 27/10 | Roteiro de retomada `ROTEIRO_APROVACAO_META.md` | Commit `77d4179` (feito pelo usuário) |
+
+**Situação de cada parte em 27/10/2026.**
+
+- **Hub (DigitalOcean):**
+  - 0.4.1 no ar, com `schema_ok=false`. Os eventos e os vínculos de cadastro ficam em memória (um worker só).
+  - `META_EMBEDDED_SIGNUP_CONFIG_ID` vazio. A página `/onboarding` mostra "O cadastro do WhatsApp ainda não está liberado", que é o esperado.
+- **Agente nesta máquina:** o serviço instalado responde **0.3.2**. O usuário já gerou o `dist\whatsph.exe` e o `instalador\saida\instalarWHATSPH.exe` 0.4.1, mas ainda não rodou o instalador.
+- **PHVCL:** r2307 e r2308 commitadas pelo usuário. Falta o Rebuild do `PH.bpl` e do GEPH no C++ Builder 5.
+- **Meta:**
+  - empresa verificada;
+  - configurações básicas salvas;
+  - App Review "em andamento" desde 27/10/2026, com prazo de até 20 dias;
+  - app **não publicado**;
+  - modelos `ph_boleto_pdf` e `ph_relatorio_pdf` aprovados na WABA da PH (as seções 3, 8 e 9 ainda dizem "pendente").
+
+**Acompanhar a análise:** https://developers.facebook.com/apps/2053406131958490/app-review/submissions/
+
+**Durante a análise:**
+- não alterar as configurações do app;
+- não mexer na política de privacidade;
+- não apagar o modelo `ph_teste_revisao`;
+- manter o hub no ar.
+
+**Depois da aprovação** (ordem e detalhes em `ROTEIRO_APROVACAO_META.md`):
+1. assinar no webhook os campos `history`, `smb_app_state_sync`, `smb_message_echoes` e `account_update`;
+2. publicar o app;
+3. criar a configuração do cadastro com validade do token "Nunca";
+4. colocar o ID em `META_EMBEDDED_SIGNUP_CONFIG_ID`;
+5. testar com um escritório piloto;
+6. o escritório cadastra a forma de pagamento no WhatsApp Manager;
+7. distribuir o WHATSPH 0.4.1 e o GEPH novo.
+
+**Decisões do usuário que valem daqui para frente.**
+
+- Coexistência: o escritório usa o mesmo número do app WhatsApp Business.
+- O App Secret não será trocado, apesar de ter aparecido nos logs antigos da DigitalOcean antes da correção.
+- Commit e push só a pedido.
+
+**Pontos não testados com a Meta real.**
+
+- Cadastro completo.
+- `smb_app_data`.
+- Criação de modelos na WABA do escritório pela Resumable Upload API com o token do cadastro.
+
+Se a criação de modelos falhar, o agente registra no `logs\whatsph.log` e tenta de novo em 30 minutos.
